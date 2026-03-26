@@ -5,6 +5,13 @@ linters:
   disable:
     - errcheck
 
+linters-settings:
+  staticcheck:
+    checks:
+      - "all"
+      - "-QF*"      # Disable quickfix suggestions (style, not bugs)
+      - "-ST1000"    # Package comments not required
+
 issues:
   exclude-rules:
     - path: _test\.go
