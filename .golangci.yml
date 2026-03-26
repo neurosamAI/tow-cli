@@ -1,10 +1,9 @@
-# golangci-lint configuration
-# by neurosam.AI
+version: "2"
 
 linters:
   default: standard
   disable:
-    - errcheck       # Too strict for deployment tool (many fire-and-forget SSH commands)
+    - errcheck
 
 issues:
   exclude-rules:
