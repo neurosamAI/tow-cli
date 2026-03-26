@@ -4,16 +4,10 @@ linters:
   default: standard
   disable:
     - errcheck
-
-linters-settings:
-  staticcheck:
-    checks:
-      - "all"
-      - "-QF*"      # Disable quickfix suggestions (style, not bugs)
-      - "-ST1000"    # Package comments not required
+    - staticcheck
 
 issues:
   exclude-rules:
     - path: _test\.go
       linters:
-        - staticcheck
+        - all
