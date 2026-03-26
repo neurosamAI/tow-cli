@@ -1,0 +1,68 @@
+baseURL = 'https://tow-cli.neurosam.ai/'
+languageCode = 'en'
+title = 'Tow — Lightweight Deployment Orchestrator'
+theme = 'neurosam-docs'
+enableRobotsTXT = true
+
+[params]
+  description = 'Lightweight, agentless deployment orchestrator for bare-metal servers and cloud VMs.'
+  author = 'Neurosam AI Team'
+  keywords = 'Tow,deployment,DevOps,CLI,SSH,agentless,orchestrator,bare-metal,VM'
+  version = 'v0.1.0'
+  github = 'https://github.com/neurosamAI/tow-cli'
+  mainSiteURL = 'https://neurosam.ai'
+  ossURL = 'https://oss.neurosam.ai'
+
+[params.nav]
+  [[params.nav.items]]
+    title = 'Home'
+    url = '/'
+    weight = 1
+  [[params.nav.items]]
+    title = 'Getting Started'
+    url = '/docs/getting-started/'
+    weight = 2
+  [[params.nav.items]]
+    title = 'Architecture'
+    url = '/docs/architecture/'
+    weight = 3
+  [[params.nav.items]]
+    title = 'Configuration'
+    url = '/docs/configuration/'
+    weight = 4
+  [[params.nav.items]]
+    title = 'Commands'
+    url = '/docs/commands/'
+    weight = 5
+  [[params.nav.items]]
+    title = 'Secrets & Security'
+    url = '/docs/security/'
+    weight = 6
+  [[params.nav.items]]
+    title = 'Examples'
+    url = '/docs/examples/'
+    weight = 7
+  [[params.nav.items]]
+    title = 'Comparison'
+    url = '/docs/comparison/'
+    weight = 8
+  [[params.nav.items]]
+    title = 'Contributing'
+    url = '/docs/contributing/'
+    weight = 9
+
+[sitemap]
+  changefreq = 'weekly'
+  priority = 0.5
+
+[markup]
+  [markup.goldmark]
+    [markup.goldmark.renderer]
+      unsafe = true
+  [markup.highlight]
+    style = 'dracula'
+    lineNos = false
+
+[outputs]
+  home = ['HTML', 'RSS']
+  section = ['HTML', 'RSS']

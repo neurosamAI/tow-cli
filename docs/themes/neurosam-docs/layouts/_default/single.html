@@ -1,0 +1,43 @@
+{{ define "main" }}
+<div class="max-w-4xl mx-auto px-5 sm:px-8 py-10">
+  <article class="prose max-w-none">
+    {{ .Content }}
+  </article>
+
+  <!-- Prev/Next nav -->
+  <div class="flex items-center justify-between mt-12 pt-6 border-t border-white/[0.06]">
+    {{ $pages := where .Site.Params.nav.items "url" "ne" "/" }}
+    {{ $currentURL := .RelPermalink }}
+    {{ $prev := false }}
+    {{ $next := false }}
+    {{ $found := false }}
+    {{ range $i, $item := $pages }}
+      {{ if $found }}
+        {{ if not $next }}
+          {{ $next = $item }}
+        {{ end }}
+      {{ end }}
+      {{ if eq $currentURL $item.url }}
+        {{ $found = true }}
+      {{ else if not $found }}
+        {{ $prev = $item }}
+      {{ end }}
+    {{ end }}
+
+    <div>
+      {{ with $prev }}
+      <a href="{{ .url }}" class="text-sm text-gray-500 hover:text-brand-400 transition-colors">
+        <i class="fas fa-arrow-left mr-1 text-xs"></i> {{ .title }}
+      </a>
+      {{ end }}
+    </div>
+    <div>
+      {{ with $next }}
+      <a href="{{ .url }}" class="text-sm text-gray-500 hover:text-brand-400 transition-colors">
+        {{ .title }} <i class="fas fa-arrow-right ml-1 text-xs"></i>
+      </a>
+      {{ end }}
+    </div>
+  </div>
+</div>
+{{ end }}

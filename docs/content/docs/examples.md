@@ -1,13 +1,10 @@
 ---
-layout: default
 title: Examples
 ---
 
 # Examples & Use Cases
 
 Real-world deployment scenarios with complete configurations.
-
----
 
 ## Spring Boot Microservices
 
@@ -114,8 +111,6 @@ tow status -e prod -m api-server
 tow rollback -e prod -m api-server
 ```
 
----
-
 ## Node.js / NestJS Application
 
 ```yaml
@@ -162,8 +157,6 @@ modules:
       PM2_INSTANCES: 4
 ```
 
----
-
 ## Python / FastAPI Application
 
 ```yaml
@@ -208,8 +201,6 @@ modules:
       - uploads
 ```
 
----
-
 ## Go Microservice
 
 ```yaml
@@ -246,8 +237,6 @@ modules:
       timeout: 30
 ```
 
----
-
 ## Multi-Environment with Hierarchical Config
 
 For projects that need different configuration per environment and per server:
@@ -279,8 +268,6 @@ When deploying `api-server` to `prod` server `1`:
 1. `config/application.yml` is copied (base)
 2. `config/prod/application.yml` is overlaid (environment)
 3. `config/prod-1/application.yml` is overlaid (server-specific)
-
----
 
 ## CI/CD Integration
 
@@ -349,8 +336,6 @@ deploy-prod:
     - rm -f ~/.ssh/deploy.pem
 ```
 
----
-
 ## Gradual Rollout (Server-by-Server)
 
 Deploy to one server at a time and verify before continuing:
@@ -376,8 +361,6 @@ If something goes wrong at any step:
 # Instant rollback on the affected server
 tow rollback -e prod -m api-server -s 1
 ```
-
----
 
 ## Infrastructure Services (28 Plugins)
 
@@ -436,8 +419,6 @@ tow auto -e prod -m redis -s 1
 tow status -e prod -m redis
 ```
 
----
-
 ## Rolling Deploy with Auto-Rollback
 
 The safest way to deploy to production — one server at a time, with automatic revert if anything goes wrong:
@@ -456,8 +437,6 @@ What happens:
 6. **Start server-2** → wait for health check → pass ✓
 7. If any server fails health check → **auto-rollback all servers** to previous version
 
----
-
 ## Notifications (Slack / Discord / Webhook)
 
 Get notified about deployment events:
@@ -472,8 +451,6 @@ notifications:
 ```
 
 Events sent automatically: `deploy_start`, `deploy_success`, `deploy_failed`, `auto_rollback`.
-
----
 
 ## Auto-Cleanup with Retention Policy
 
@@ -491,8 +468,6 @@ Or manual cleanup:
 ```bash
 tow cleanup -e prod -m api-server --keep 3
 ```
-
----
 
 ## AI Agent Integration
 
@@ -522,8 +497,6 @@ Then ask Claude: *"Deploy api-server to staging"* or *"Check prod status and sho
   }
 }
 ```
-
----
 
 ## Debugging Production Issues
 

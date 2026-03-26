@@ -1,5 +1,4 @@
 ---
-layout: default
 title: Secrets & Security
 ---
 
@@ -54,8 +53,6 @@ modules:
 ```
 
 > **Warning**: Password auth is the least secure option. Use it only when key-based auth is not available. Never hardcode passwords in `tow.yaml`.
-
----
 
 ## Secrets Management
 
@@ -136,8 +133,6 @@ credentials.*
 tow.local.yaml
 ```
 
----
-
 ## Host Key Verification
 
 By default, Tow verifies server identities using `~/.ssh/known_hosts`:
@@ -151,8 +146,6 @@ tow deploy -e prod -m api-server --insecure
 ```
 
 > **Recommendation**: Always maintain an up-to-date `known_hosts` file. Run `ssh-keyscan your-server >> ~/.ssh/known_hosts` for new servers.
-
----
 
 ## Production Confirmation Prompt
 
@@ -171,8 +164,6 @@ tow auto -e prod -m api-server --auto-rollback -y
 ```
 
 This prevents accidental production deployments from a quick `tow deploy` typo.
-
----
 
 ## Branch Policies
 
@@ -206,8 +197,6 @@ environments:
 
 This prevents scenarios like deploying a feature branch to production.
 
----
-
 ## Deploy Locking
 
 Tow uses atomic lock files to prevent concurrent deployments:
@@ -224,8 +213,6 @@ If a deploy is interrupted and the lock isn't released:
 ```bash
 tow unlock -e prod -m api-server
 ```
-
----
 
 ## Per-Module SSH Configuration
 
@@ -246,8 +233,6 @@ modules:
 ```
 
 This supports the principle of least privilege — each service uses only the credentials it needs.
-
----
 
 ## Network Security Recommendations
 
@@ -285,8 +270,6 @@ When using Tow in CI/CD pipelines:
     tow deploy -e prod -m api-server -c tow.yaml
     rm /tmp/deploy.pem
 ```
-
----
 
 ## Security Checklist
 

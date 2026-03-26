@@ -1,5 +1,4 @@
 ---
-layout: default
 title: Home
 ---
 
@@ -7,12 +6,10 @@ title: Home
   <h1>Tow</h1>
   <p class="subtitle">Deploy to bare-metal servers and VMs — without the complexity of Kubernetes.</p>
   <div class="hero-buttons">
-    <a href="{{ '/getting-started' | relative_url }}" class="btn btn-primary">Get Started</a>
+    <a href="/docs/getting-started/" class="btn btn-primary">Get Started</a>
     <a href="https://github.com/neurosamAI/tow-cli" class="btn btn-secondary">GitHub</a>
   </div>
 </div>
-
----
 
 ## What is Tow?
 
@@ -102,7 +99,7 @@ tow auto -e dev -m my-project
 | AI agent support (MCP) | **Yes** | No | No | No |
 
 <p style="text-align: center; margin-top: 1rem;">
-  <a href="{{ '/comparison' | relative_url }}" style="color: var(--accent);">See full comparison →</a>
+  <a href="/docs/comparison/" style="color: #60a5fa;">See full comparison →</a>
 </p>
 
 ## Real-World Scenarios
@@ -152,8 +149,6 @@ tow init    # 5 seconds. Done.
 ```
 
 Tow auto-detects everything — language, framework, build tool, monorepo modules — and generates a complete, working config.
-
----
 
 ## Who Is This For?
 

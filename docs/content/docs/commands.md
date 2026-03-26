@@ -1,5 +1,4 @@
 ---
-layout: default
 title: Commands
 ---
 
@@ -18,8 +17,6 @@ These flags are available on all commands:
 | `--verbose` | `-v` | Enable debug output | `false` |
 | `--dry-run` | | Show actions without executing | `false` |
 | `--insecure` | | Skip SSH host key verification | `false` |
-
----
 
 ## Commands
 
@@ -45,8 +42,6 @@ Generates:
 
 > **Note**: Library modules (ending in `-common`, `-core`, `-support`, `-lib`, `-shared`, `-util`) are automatically excluded from deployment modules.
 
----
-
 ### `tow validate`
 
 Validate configuration file without connecting to servers.
@@ -62,8 +57,6 @@ Checks:
 - Module type validity
 - Health check configuration
 
----
-
 ### `tow deploy`
 
 Run the deploy pipeline: **package → upload → install → stop → start**.
@@ -74,8 +67,6 @@ tow deploy -e prod -m api-server -s 1    # Deploy to server 1 only
 tow deploy -e prod                        # Deploy all modules
 tow deploy -e prod --dry-run              # Preview without executing
 ```
-
----
 
 ### `tow auto`
 
@@ -88,8 +79,6 @@ tow auto -e prod -m api-server --dry-run
 
 This is the most common command for end-to-end deployment from source code to running service.
 
----
-
 ### `tow start`
 
 Start a module on remote servers.
@@ -101,8 +90,6 @@ tow start -e prod -m api-server -s 1
 
 After starting, Tow runs health checks based on the module's `health_check` configuration.
 
----
-
 ### `tow stop`
 
 Stop a module on remote servers.
@@ -112,8 +99,6 @@ tow stop -e prod -m api-server
 tow stop -e prod -m api-server -s 2
 ```
 
----
-
 ### `tow restart`
 
 Stop then start a module.
@@ -121,8 +106,6 @@ Stop then start a module.
 ```bash
 tow restart -e prod -m api-server
 ```
-
----
 
 ### `tow status`
 
@@ -138,8 +121,6 @@ Shows:
 - Memory usage
 - Current deployment version (symlink target)
 
----
-
 ### `tow rollback`
 
 Switch to a previous deployment version.
@@ -154,8 +135,6 @@ tow rollback -e prod -m api-server -t 20240626-101530
 
 Rollback is instant — it switches the `current` symlink and restarts the service. No re-upload or re-build required.
 
----
-
 ### `tow logs`
 
 Stream remote log files.
@@ -166,8 +145,6 @@ tow logs -e prod -m api-server -f "ERROR"      # Filter with grep
 tow logs -e prod -m api-server -n 100           # Last 100 lines
 tow logs -e prod -m api-server -s 1             # Specific server
 ```
-
----
 
 ### `tow setup`
 
@@ -189,8 +166,6 @@ Creates on each server:
 └── {data_dirs}  # Custom data directories
 ```
 
----
-
 ### `tow upload`
 
 Transfer a file to remote servers.
@@ -199,8 +174,6 @@ Transfer a file to remote servers.
 tow upload -e prod -m api-server
 tow upload -e prod -m api-server path/to/file.tar.gz
 ```
-
----
 
 ### `tow install`
 
@@ -212,8 +185,6 @@ tow install -e prod -m api-server
 
 Creates a new timestamped directory in `deploy/` and updates the symlink.
 
----
-
 ### `tow list`
 
 List configuration information.
@@ -224,8 +195,6 @@ tow list envs          # List all environments
 tow list deployments -e prod -m api-server  # List deployment history
 ```
 
----
-
 ### `tow login`
 
 Open an interactive SSH session to a server.
@@ -233,8 +202,6 @@ Open an interactive SSH session to a server.
 ```bash
 tow login -e prod -m api-server -s 1
 ```
-
----
 
 ### `tow unlock`
 
@@ -245,8 +212,6 @@ tow unlock -e prod -m api-server
 ```
 
 Use this when a deploy was interrupted and the lock wasn't cleaned up.
-
----
 
 ### `tow cleanup`
 
@@ -265,8 +230,6 @@ retention:
   auto_cleanup: true    # Clean up after every deploy/auto
 ```
 
----
-
 ### `tow download`
 
 Download files from a remote server to local.
@@ -277,8 +240,6 @@ tow download -e prod -m api-server /var/log/syslog -d ./local-logs/
 ```
 
 If the path is relative, it's resolved against the module base directory.
-
----
 
 ### `tow provision`
 
@@ -297,8 +258,6 @@ tow provision -e prod -m api-server --timezone Asia/Seoul --locale en_US.UTF-8 -
 
 This also runs `tow setup` to create the deployment directory structure.
 
----
-
 ### `tow threaddump`
 
 Trigger a thread dump on Java/Spring Boot modules for debugging.
@@ -312,8 +271,6 @@ Sends `kill -3` to the JVM process. Thread dump output is written to the applica
 
 > Only available for modules with type `springboot` or `java`.
 
----
-
 ### `tow mcp-server`
 
 Start the MCP (Model Context Protocol) server for AI agent integration.
@@ -324,8 +281,6 @@ tow mcp-server -c /path/to/tow.yaml
 ```
 
 This exposes Tow operations as tools for AI assistants (Claude, Cursor, Windsurf). See [AI Agent Integration](#ai-agent-integration) below.
-
----
 
 ## Advanced Flags
 
@@ -371,8 +326,6 @@ tow status -e prod -m api-server -o json
 tow list deployments -e prod -m api-server -o json
 ```
 
----
-
 ## AI Agent Integration
 
 ### MCP Server
@@ -403,8 +356,6 @@ Configure in Claude Desktop, Cursor, or any MCP-compatible client:
 | `tow_list_modules` | List configured modules |
 | `tow_list_environments` | List configured environments |
 
----
-
 ## Command Pipelines
 
 | Command | build | package | upload | install | stop | start | health check |
@@ -417,8 +368,6 @@ Configure in Claude Desktop, Cursor, or any MCP-compatible client:
 | `rollback` | | | | ● | ● | ● | ● |
 | `upload` | | | ● | | | | |
 | `install` | | | | ● | | | |
-
----
 
 ## Dry-Run Mode
 

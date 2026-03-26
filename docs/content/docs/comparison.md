@@ -1,13 +1,10 @@
 ---
-layout: default
 title: Comparison
 ---
 
 # Why Tow?
 
 There are many deployment tools out there. Here's how Tow compares — and why we built it.
-
----
 
 ## The Problem
 
@@ -53,8 +50,6 @@ tow auto -e prod  # Done.
 
 That's the difference. Not in features on paper — in **time to first deploy**.
 
----
-
 ## Comparison Table
 
 | | **Tow** | **Capistrano** | **Ansible** | **Kamal** | **Fabric** | **Deployer** | **PM2** |
@@ -77,8 +72,6 @@ That's the difference. Not in features on paper — in **time to first deploy**.
 | **Built-in notifications** | ● | ● | | | | | |
 | **Learning curve** | Low | Medium | High | Medium | Medium | Medium | Low |
 | **GitHub Stars** | New | ~13k | ~63k | ~14k | ~15k | ~11k | ~43k |
-
----
 
 ## Tow vs. Ansible
 
@@ -103,8 +96,6 @@ That's the difference. Not in features on paper — in **time to first deploy**.
 A common real-world story: a team adopts Ansible for deployments. Month 1, it works. By month 6, they have 2,000 lines of playbooks that nobody fully understands. A new developer joins and is afraid to touch the deploy scripts. Rollback? Hope you remember which playbook version was running on which server.
 
 With Tow, your entire deployment config is a single readable YAML file. Rollback is `tow rollback`. A new developer can deploy on day one.
-
----
 
 ## Tow vs. Capistrano
 
@@ -134,8 +125,6 @@ tow auto -e prod -m ml-service       # Python — knows about pip, gunicorn, vir
 ```
 
 One tool. One config. No Ruby required.
-
----
 
 ## Tow vs. Kamal
 
@@ -175,8 +164,6 @@ With Tow, the JVM runs directly on the OS. Full RAM is available. Logs are plain
 
 Kamal is the right choice if you're already containerized. But if Docker isn't already part of your stack, Tow lets you ship without adding that complexity.
 
----
-
 ## Tow vs. Fabric
 
 **Fabric** is a Python SSH task runner — a low-level building block, not a deployment framework.
@@ -191,8 +178,6 @@ Kamal is the right choice if you're already containerized. But if Docker isn't a
 
 **Choose Fabric** if you need a programmable SSH toolkit for custom automation. **Choose Tow** if you want a complete deployment solution out of the box.
 
----
-
 ## Tow vs. PM2 Deploy
 
 **PM2** is a Node.js process manager with basic deployment capabilities.
@@ -206,8 +191,6 @@ Kamal is the right choice if you're already containerized. But if Docker isn't a
 | **Health checks** | HTTP, TCP, log, command | Process monitoring |
 
 **Choose PM2** if you're running a single Node.js app and want built-in process clustering. **Choose Tow** for multi-service, multi-language deployments.
-
----
 
 ## What Makes Tow Unique
 
@@ -277,8 +260,6 @@ The ultimate differentiator is **how fast you go from zero to a working deployme
 | **Tow** | `go install ...` → `tow init` → Edit 3 lines (server IPs) → `tow auto -e prod` |
 
 Tow is designed so that **your first deploy happens in minutes, not days**.
-
----
 
 ## Migration Guides
 

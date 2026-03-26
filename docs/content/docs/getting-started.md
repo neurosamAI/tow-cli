@@ -1,5 +1,4 @@
 ---
-layout: default
 title: Getting Started
 ---
 
@@ -179,8 +178,6 @@ tow rollback -e dev -m api-server
 tow rollback -e dev -m api-server -t 20240626-101530
 ```
 
----
-
 ## Deployment Flow Overview
 
 ```
@@ -200,11 +197,9 @@ tow rollback -e dev -m api-server -t 20240626-101530
 
 Rollback is instant — just switch the `current` symlink to any previous deployment directory.
 
----
-
 ## What's Next?
 
-- [Architecture]({{ '/architecture' | relative_url }}) — Understand how Tow works under the hood
-- [Configuration]({{ '/configuration' | relative_url }}) — Full reference for `tow.yaml`
-- [Commands]({{ '/commands' | relative_url }}) — Complete CLI reference
-- [Examples]({{ '/examples' | relative_url }}) — Real-world deployment scenarios
+- [Architecture](/docs/architecture/) — Understand how Tow works under the hood
+- [Configuration](/docs/configuration/) — Full reference for `tow.yaml`
+- [Commands](/docs/commands/) — Complete CLI reference
+- [Examples](/docs/examples/) — Real-world deployment scenarios

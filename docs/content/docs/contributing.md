@@ -1,5 +1,4 @@
 ---
-layout: default
 title: Contributing
 ---
 
@@ -36,8 +35,6 @@ make test        # Run all tests
 make lint        # Run golangci-lint
 ```
 
----
-
 ## Project Structure
 
 ```
@@ -57,8 +54,6 @@ tow-cli/
 ├── Makefile            # Build automation
 └── go.mod              # Go module definition
 ```
-
----
 
 ## Development Guidelines
 
@@ -94,7 +89,7 @@ func init() {
 1. Add the Cobra command in `cmd/tow/main.go`
 2. Implement the logic in the appropriate `internal/` package
 3. Add tests
-4. Update the [Commands]({{ '/commands' | relative_url }}) documentation
+4. Update the [Commands](/docs/commands/) documentation
 
 ### Writing Tests
 
@@ -102,8 +97,6 @@ func init() {
 - Initializer tests go in `internal/initializer/initializer_test.go`
 - Use table-driven tests where appropriate
 - Mock SSH connections for deploy tests
-
----
 
 ## Contribution Types
 
@@ -131,8 +124,6 @@ Open an issue describing:
 4. Write a clear PR description
 5. Reference any related issues
 
----
-
 ## Roadmap
 
 We're building Tow into the go-to deployment tool for teams on bare metal and VMs. Here are areas where contributions are especially welcome:
@@ -146,14 +137,10 @@ We're building Tow into the go-to deployment tool for teams on bare metal and VM
 - **Multi-region support** — Coordinate deployments across regions
 - **Config encryption** — Encrypt sensitive values in `tow.yaml`
 
----
-
 ## Community
 
 - **GitHub Issues**: [github.com/neurosamAI/tow-cli/issues](https://github.com/neurosamAI/tow-cli/issues)
 - **Discussions**: [github.com/neurosamAI/tow-cli/discussions](https://github.com/neurosamAI/tow-cli/discussions)
-
----
 
 ## License
 

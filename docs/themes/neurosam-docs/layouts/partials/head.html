@@ -1,0 +1,123 @@
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ if .IsHome }}{{ .Site.Title }}{{ else }}{{ .Title }} — Tow{{ end }}</title>
+<meta name="description" content="{{ with .Description }}{{ . }}{{ else }}{{ .Site.Params.description }}{{ end }}">
+<meta name="author" content="{{ .Site.Params.author }}">
+{{ with .Site.Params.keywords }}<meta name="keywords" content="{{ . }}">{{ end }}
+<link rel="canonical" href="{{ .Permalink }}">
+
+<!-- Open Graph -->
+<meta property="og:title" content="{{ .Title }}">
+<meta property="og:description" content="{{ with .Description }}{{ . }}{{ else }}{{ .Site.Params.description }}{{ end }}">
+<meta property="og:type" content="{{ if .IsPage }}article{{ else }}website{{ end }}">
+<meta property="og:url" content="{{ .Permalink }}">
+<meta property="og:site_name" content="{{ .Site.Title }}">
+
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: {
+          sans: ['Noto Sans KR', 'Inter', 'system-ui', 'sans-serif'],
+          display: ['Inter', 'Noto Sans KR', 'sans-serif'],
+          mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+        },
+        colors: {
+          brand: {
+            50: '#eff6ff',
+            100: '#dbeafe',
+            200: '#bfdbfe',
+            400: '#60a5fa',
+            500: '#3b82f6',
+            600: '#2563eb',
+            700: '#1d4ed8',
+            900: '#0c1527',
+            950: '#080e1a',
+          }
+        }
+      }
+    }
+  }
+</script>
+
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+KR:wght@400;500;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<!-- FontAwesome -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<!-- Favicon -->
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#9875;</text></svg>">
+
+<style>
+  html { scroll-behavior: smooth; }
+  body { font-family: 'Inter', 'Noto Sans KR', sans-serif; }
+  .text-gradient {
+    background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  /* Prose — matches neurosam.ai */
+  .prose { font-size: 1rem; line-height: 1.85; color: #d1d5db; }
+  .prose h1 { font-size: 1.875rem; font-weight: 800; color: #f9fafb; margin-top: 2.5rem; margin-bottom: 0.75rem; letter-spacing: -0.02em; }
+  .prose h2 { font-size: 1.375rem; font-weight: 700; color: #f3f4f6; margin-top: 2.25rem; margin-bottom: 0.625rem; padding-bottom: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .prose h3 { font-size: 1.125rem; font-weight: 600; color: #e5e7eb; margin-top: 1.75rem; margin-bottom: 0.5rem; }
+  .prose h4 { font-size: 1rem; font-weight: 600; color: #e5e7eb; margin-top: 1.5rem; margin-bottom: 0.375rem; }
+  .prose p { color: #9ca3af; margin-bottom: 1.125rem; word-break: keep-all; }
+  .prose a { color: #60a5fa; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: rgba(96,165,250,0.25); }
+  .prose a:hover { color: #93c5fd; text-decoration-color: rgba(96,165,250,0.5); }
+  .prose strong { color: #e5e7eb; font-weight: 600; }
+  .prose ul { list-style-type: disc; padding-left: 1.5rem; margin-bottom: 1.125rem; }
+  .prose ol { list-style-type: decimal; padding-left: 1.5rem; margin-bottom: 1.125rem; }
+  .prose li { color: #9ca3af; margin-bottom: 0.375rem; line-height: 1.8; }
+  .prose li::marker { color: #4b5563; }
+  .prose blockquote { border-left: 3px solid #3b82f6; background: rgba(255,255,255,0.02); padding: 0.875rem 1.125rem; margin: 1.25rem 0; border-radius: 0 8px 8px 0; color: #6b7280; font-style: italic; }
+  .prose blockquote p { color: #6b7280; margin-bottom: 0; }
+  .prose blockquote strong { color: #d1d5db; }
+  .prose code { color: #e5e7eb; background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px; font-size: 0.875em; font-family: 'JetBrains Mono', monospace; }
+  .prose pre { background: #0c1527; border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 1.125rem; overflow-x: auto; margin: 1.25rem 0; }
+  .prose pre code { background: none; padding: 0; font-size: 0.8125rem; line-height: 1.7; color: #d1d5db; }
+  .prose table { width: 100%; border-collapse: collapse; margin: 1.25rem 0; font-size: 0.875rem; }
+  .prose thead { border-bottom: 2px solid rgba(255,255,255,0.08); }
+  .prose th { color: #e5e7eb; background: rgba(255,255,255,0.03); padding: 0.625rem 0.875rem; text-align: left; font-weight: 600; }
+  .prose td { color: #9ca3af; padding: 0.625rem 0.875rem; border-bottom: 1px solid rgba(255,255,255,0.04); }
+  .prose tr:hover td { background: rgba(255,255,255,0.02); }
+  .prose hr { border: none; border-top: 1px solid rgba(255,255,255,0.06); margin: 2rem 0; }
+  .prose img { border-radius: 8px; margin: 1.25rem 0; }
+
+  /* Features grid from index */
+  .prose .features { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin: 1.5rem 0; }
+  .prose .feature { padding: 1.25rem; border-radius: 0.75rem; border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.02); }
+  .prose .feature h3 { margin-top: 0; font-size: 0.9375rem; color: #f3f4f6; }
+  .prose .feature p { font-size: 0.8125rem; color: #6b7280; margin-bottom: 0; }
+  @media (max-width: 640px) { .prose .features { grid-template-columns: 1fr; } }
+
+  /* Hero buttons */
+  .prose .hero { text-align: center; padding: 2rem 0 1rem; }
+  .prose .hero h1 { font-size: 3rem; background: linear-gradient(135deg, #3b82f6, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-top: 0; }
+  .prose .hero .subtitle { font-size: 1.125rem; color: #9ca3af; max-width: 36rem; margin: 0 auto 1.5rem; }
+  .prose .hero-buttons { display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap; }
+  .prose .btn { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.625rem 1.5rem; border-radius: 0.5rem; font-size: 0.875rem; font-weight: 600; text-decoration: none; transition: all 0.2s; }
+  .prose .btn-primary { background: #3b82f6; color: #fff; }
+  .prose .btn-primary:hover { background: #2563eb; color: #fff; text-decoration: none; }
+  .prose .btn-secondary { border: 1px solid rgba(255,255,255,0.1); color: #d1d5db; }
+  .prose .btn-secondary:hover { border-color: rgba(255,255,255,0.2); color: #fff; text-decoration: none; }
+
+  .prose .brand-footer { text-align: center; font-size: 0.75rem; color: #4b5563; margin-top: 2rem; }
+  .prose .brand-footer a { color: #6b7280; text-decoration: underline; }
+  .prose .line-glow { background: linear-gradient(90deg, transparent, rgba(59,130,246,0.3), transparent); height: 1px; margin: 2rem 0; }
+
+  /* Sidebar active state */
+  .sidebar-link.active { color: #60a5fa; background: rgba(96,165,250,0.08); }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+</style>

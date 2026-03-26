@@ -1,5 +1,4 @@
 ---
-layout: default
 title: Configuration
 ---
 
@@ -16,8 +15,6 @@ Tow looks for configuration in this order:
 3. `tow.local.yaml` is merged on top (for local overrides)
 
 > **Tip**: Add `tow.local.yaml` to `.gitignore`. Use it for developer-specific SSH key paths or custom settings that shouldn't be shared.
-
----
 
 ## Full Schema
 
@@ -190,8 +187,6 @@ modules:
       key_path: ~/.ssh/special-key.pem
 ```
 
----
-
 ## Module Types
 
 ### Built-in (Language/Framework)
@@ -243,8 +238,6 @@ modules:
 
 All defaults can be overridden in `tow.yaml`. See [plugins/README.md](https://github.com/neurosamAI/tow-cli/tree/main/plugins) for full list and plugin authoring guide.
 
----
-
 ## Health Check Types
 
 ### TCP
@@ -295,8 +288,6 @@ health_check:
   interval: 5
 ```
 
----
-
 ## Environment Variable Interpolation
 
 Use `${VAR_NAME}` syntax anywhere in `tow.yaml`:
@@ -318,8 +309,6 @@ modules:
 
 > **Security**: Never hardcode secrets in `tow.yaml`. Use environment variables or `tow.local.yaml` (in `.gitignore`).
 
----
-
 ## Retention Policy
 
 Control how many old deployments are kept on remote servers.
@@ -333,8 +322,6 @@ retention:
 - The current active deployment is never removed
 - Manual cleanup: `tow cleanup -e prod -m api-server --keep 3`
 - Without `auto_cleanup`, old deployments accumulate until you run `tow cleanup`
-
----
 
 ## Notifications
 
@@ -367,8 +354,6 @@ Webhook payload format:
 }
 ```
 
----
-
 ## Local Overrides (`tow.local.yaml`)
 
 `tow.local.yaml` is deep-merged over `tow.yaml`. Perfect for:
@@ -394,8 +379,6 @@ Merge rules:
 - Maps are **deep-merged**
 - Lists are **replaced** (not appended)
 
----
-
 ## Hierarchical Config Directories
 
 Tow supports hierarchical configuration resolution for your application config files:
@@ -418,8 +401,6 @@ Resolution order (highest priority first):
 3. `config/`
 
 When packaging, Tow copies the resolved config files to the `conf/` directory in the deployment archive.
-
----
 
 ## Complete Example
 

@@ -1,5 +1,4 @@
 ---
-layout: default
 title: Architecture
 ---
 
@@ -37,8 +36,6 @@ Every deployment creates a timestamped directory. The `current` symlink points t
 ### Single Configuration File
 
 Everything is defined in one `tow.yaml`. No inventory files, no playbooks, no Dockerfiles — just one file that describes your entire deployment topology.
-
----
 
 ## System Overview
 
@@ -93,8 +90,6 @@ Everything is defined in one `tow.yaml`. No inventory files, no playbooks, no Do
                               │  SCP / rsync  │
                               └──────────────┘
 ```
-
----
 
 ## Core Components
 
@@ -221,8 +216,6 @@ environments:
 - Supports glob patterns for flexible branch policies
 - Configurable per-command (e.g., allow `status` from any branch)
 
----
-
 ## Hierarchical Config Resolution
 
 Configuration files are resolved in priority order:
@@ -246,8 +239,6 @@ config/
     └── application.yml       ← prod server 1 specific
 ```
 
----
-
 ## Parallel Execution
 
 When deploying to multiple servers, Tow executes operations concurrently:
@@ -265,8 +256,6 @@ tow deploy -e prod -m api-server    (2 servers configured)
 ```
 
 Results are aggregated — if any server fails, the entire operation is reported as failed.
-
----
 
 ## Lifecycle Hooks
 

@@ -1,0 +1,16 @@
+<footer class="border-t border-white/[0.06] py-8 lg:ml-[272px]">
+  <div class="max-w-4xl mx-auto px-5 sm:px-8">
+    <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <img src="/logo.svg" alt="neurosam.AI" class="h-4 w-auto opacity-50">
+        <span class="w-px h-3.5 bg-gray-800 hidden sm:block"></span>
+        <span class="text-xs text-gray-700">&copy; {{ now.Year }} Neurosam AI Inc.</span>
+      </div>
+      <div class="flex items-center gap-4">
+        <a href="{{ .Site.Params.github }}" target="_blank" class="text-gray-700 hover:text-gray-500 transition-colors text-xs"><i class="fa-brands fa-github mr-1"></i>GitHub</a>
+        <a href="{{ .Site.Params.mainSiteURL }}" class="text-gray-700 hover:text-gray-500 transition-colors text-xs">neurosam.AI</a>
+        <a href="{{ .Site.Params.ossURL }}" class="text-gray-700 hover:text-gray-500 transition-colors text-xs">Open Source</a>
+      </div>
+    </div>
+  </div>
+</footer>
