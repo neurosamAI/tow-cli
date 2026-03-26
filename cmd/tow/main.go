@@ -141,19 +141,7 @@ func resolveTargets(cmd *cobra.Command, cfg *config.Config) (string, string, int
 	return env, mod, serverNum, nil
 }
 
-// resolveServerName returns the server name from the -s flag (empty if not set or numeric)
-func resolveServerName(cmd *cobra.Command) string {
-	serverFlag, _ := cmd.Flags().GetString("server")
-	if serverFlag == "" {
-		return ""
-	}
-	// If it's a pure number, return empty (use number path)
-	var n int
-	if _, err := fmt.Sscanf(serverFlag, "%d", &n); err == nil {
-		return ""
-	}
-	return serverFlag
-}
+
 
 // confirmProdDeploy asks for user confirmation when deploying to production-like environments
 func confirmProdDeploy(envName, moduleName, command string) bool {

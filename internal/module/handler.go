@@ -295,7 +295,7 @@ type DotNetHandler struct{}
 
 func (h *DotNetHandler) Name() string { return "dotnet" }
 func (h *DotNetHandler) DefaultBuildCmd(moduleName, env string) string {
-	return fmt.Sprintf("dotnet publish -c Release -o build/publish")
+	return "dotnet publish -c Release -o build/publish"
 }
 func (h *DotNetHandler) DefaultStartCmd(baseDir string, port int) string {
 	if port == 0 {
