@@ -1,0 +1,39 @@
+# Grafana Promtail module handler
+# by neurosam.AI — https://neurosam.ai
+
+name: promtail
+description: Grafana Promtail — log shipping agent for Loki
+version: "1.0.0"
+author: neurosam.AI
+
+package:
+  default_version: "2.9.4"
+  url_template: "https://github.com/grafana/loki/releases/download/v{{VERSION}}/promtail-linux-amd64.zip"
+  versions:
+    "2.9.4": "https://github.com/grafana/loki/releases/download/v2.9.4/promtail-linux-amd64.zip"
+    "2.9.3": "https://github.com/grafana/loki/releases/download/v2.9.3/promtail-linux-amd64.zip"
+    "2.8.7": "https://github.com/grafana/loki/releases/download/v2.8.7/promtail-linux-amd64.zip"
+
+build_cmd: ""
+start_cmd: "nohup {{BASE_DIR}}/current/promtail-linux-amd64 -config.file={{BASE_DIR}}/conf/config.yml > {{BASE_DIR}}/logs/promtail.log 2>&1 &"
+stop_cmd: "kill $(pgrep -f 'promtail.*{{BASE_DIR}}') 2>/dev/null || true"
+status_cmd: "curl -sf http://localhost:{{PORT}}/ready"
+
+artifact_path: "external-package/promtail.zip"
+package_includes:
+  - promtail-linux-amd64
+
+health_check:
+  type: http
+  target: "http://localhost:{{PORT}}/ready"
+  timeout: 30
+
+provision:
+  directories:
+    - "{{BASE_DIR}}/data"
+    - "{{BASE_DIR}}/data/positions"
+
+data_dirs:
+  - data
+
+log_file: "promtail.log"

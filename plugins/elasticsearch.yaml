@@ -1,0 +1,50 @@
+# Elasticsearch module handler
+# by neurosam.AI — https://neurosam.ai
+#
+# Place this file in:
+#   - ./plugins/ (project-level)
+#   - ~/.tow/plugins/ (global)
+
+name: elasticsearch
+description: Elasticsearch search engine
+version: "1.0.0"
+author: neurosam.AI
+
+package:
+  default_version: "8.13.0"
+  url_template: "https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-{{VERSION}}-linux-x86_64.tar.gz"
+  versions:
+    "8.13.0": "https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-8.13.0-linux-x86_64.tar.gz"
+    "8.12.0": "https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-8.12.0-linux-x86_64.tar.gz"
+    "7.17.18": "https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-7.17.18-linux-x86_64.tar.gz"
+
+build_cmd: ""
+start_cmd: "{{BASE_DIR}}/current/bin/elasticsearch -d -p {{BASE_DIR}}/elasticsearch.pid"
+stop_cmd: "kill $(cat {{BASE_DIR}}/elasticsearch.pid 2>/dev/null) 2>/dev/null || true"
+status_cmd: "curl -sf http://localhost:{{PORT}}/_cluster/health | head -1"
+
+artifact_path: "external-package/elasticsearch.tar.gz"
+package_includes:
+  - bin/
+  - config/
+  - lib/
+  - modules/
+
+health_check:
+  type: http
+  target: "http://localhost:{{PORT}}/_cluster/health"
+  timeout: 120
+
+provision:
+  packages:
+    - openjdk-17-jre-headless
+  directories:
+    - "{{BASE_DIR}}/data"
+    - "{{BASE_DIR}}/logs"
+  commands:
+    - "sysctl -w vm.max_map_count=262144 2>/dev/null || true"
+
+data_dirs:
+  - data
+
+log_file: "elasticsearch.log"

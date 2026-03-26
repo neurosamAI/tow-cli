@@ -1,0 +1,145 @@
+{
+  "name": "tow-deploy",
+  "displayName": "Tow Deploy",
+  "description": "Deploy to bare-metal servers and VMs — without the complexity of Kubernetes",
+  "version": "0.1.0",
+  "publisher": "neurosamai",
+  "author": {
+    "name": "Murry Jeong (comchangs)",
+    "url": "https://github.com/comchangs"
+  },
+  "license": "MIT",
+  "icon": "assets/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/neurosamAI/tow-cli"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other",
+    "SCM Providers"
+  ],
+  "keywords": [
+    "deploy",
+    "deployment",
+    "ssh",
+    "devops",
+    "bare-metal",
+    "vm",
+    "rollback"
+  ],
+  "activationEvents": [
+    "workspaceContains:tow.yaml"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "tow.deploy",
+        "title": "Tow: Deploy Module",
+        "icon": "$(rocket)"
+      },
+      {
+        "command": "tow.auto",
+        "title": "Tow: Auto Deploy (Full Pipeline)",
+        "icon": "$(play)"
+      },
+      {
+        "command": "tow.rollback",
+        "title": "Tow: Rollback",
+        "icon": "$(history)"
+      },
+      {
+        "command": "tow.status",
+        "title": "Tow: Check Status",
+        "icon": "$(pulse)"
+      },
+      {
+        "command": "tow.logs",
+        "title": "Tow: Stream Logs",
+        "icon": "$(output)"
+      },
+      {
+        "command": "tow.start",
+        "title": "Tow: Start Module",
+        "icon": "$(debug-start)"
+      },
+      {
+        "command": "tow.stop",
+        "title": "Tow: Stop Module",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "tow.login",
+        "title": "Tow: SSH Login",
+        "icon": "$(terminal)"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "tow",
+          "title": "Tow Deploy",
+          "icon": "assets/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "tow": [
+        {
+          "id": "tow.environments",
+          "name": "Environments"
+        },
+        {
+          "id": "tow.modules",
+          "name": "Modules"
+        },
+        {
+          "id": "tow.deployments",
+          "name": "Deployment History"
+        }
+      ]
+    },
+    "menus": {
+      "view/item/context": [
+        {
+          "command": "tow.deploy",
+          "when": "view == tow.modules",
+          "group": "inline"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Tow Deploy",
+      "properties": {
+        "tow.configPath": {
+          "type": "string",
+          "default": "tow.yaml",
+          "description": "Path to tow.yaml configuration file"
+        },
+        "tow.defaultEnvironment": {
+          "type": "string",
+          "default": "",
+          "description": "Default environment for deployments"
+        },
+        "tow.showStatusBar": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show Tow status in the status bar"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.0"
+  }
+}

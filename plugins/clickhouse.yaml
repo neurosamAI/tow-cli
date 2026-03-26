@@ -1,0 +1,44 @@
+# ClickHouse module handler
+# by neurosam.AI — https://neurosam.ai
+
+name: clickhouse
+description: ClickHouse high-performance columnar OLAP database
+version: "1.0.0"
+author: neurosam.AI
+
+package:
+  default_version: "24.12.3.47"
+  url_template: "https://github.com/ClickHouse/ClickHouse/releases/download/v{{VERSION}}-stable/clickhouse-common-static-{{VERSION}}-amd64.tgz"
+  versions:
+    "24.12.3.47": "https://github.com/ClickHouse/ClickHouse/releases/download/v24.12.3.47-stable/clickhouse-common-static-24.12.3.47-amd64.tgz"
+    "24.8.8.17": "https://github.com/ClickHouse/ClickHouse/releases/download/v24.8.8.17-lts/clickhouse-common-static-24.8.8.17-amd64.tgz"
+    "23.8.16.40": "https://github.com/ClickHouse/ClickHouse/releases/download/v23.8.16.40-lts/clickhouse-common-static-23.8.16.40-amd64.tgz"
+
+build_cmd: ""
+start_cmd: "{{BASE_DIR}}/current/bin/clickhouse-server --config-file={{BASE_DIR}}/conf/config.xml --pid-file={{BASE_DIR}}/clickhouse.pid --daemon"
+stop_cmd: "kill $(cat {{BASE_DIR}}/clickhouse.pid 2>/dev/null) 2>/dev/null || true"
+status_cmd: "lsof -i :{{PORT}} -t 2>/dev/null"
+
+artifact_path: "external-package/clickhouse.tar.gz"
+package_includes:
+  - bin/
+  - lib/
+
+health_check:
+  type: http
+  target: "http://localhost:{{PORT}}/ping"
+  timeout: 30
+
+provision:
+  packages: []
+  directories:
+    - "{{BASE_DIR}}/data"
+    - "{{BASE_DIR}}/data/tmp"
+    - "{{BASE_DIR}}/data/user_files"
+  commands:
+    - "ulimit -n 262144 2>/dev/null || true"
+
+data_dirs:
+  - data
+
+log_file: "clickhouse-server.log"

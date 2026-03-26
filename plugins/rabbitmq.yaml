@@ -1,0 +1,42 @@
+# RabbitMQ module handler
+# by neurosam.AI — https://neurosam.ai
+
+name: rabbitmq
+description: RabbitMQ message broker
+version: "1.0.0"
+author: neurosam.AI
+
+package:
+  default_version: "3.13.1"
+  url_template: "https://github.com/rabbitmq/rabbitmq-server/releases/download/v{{VERSION}}/rabbitmq-server-generic-unix-{{VERSION}}.tar.xz"
+  versions:
+    "3.13.1": "https://github.com/rabbitmq/rabbitmq-server/releases/download/v3.13.1/rabbitmq-server-generic-unix-3.13.1.tar.xz"
+    "3.12.14": "https://github.com/rabbitmq/rabbitmq-server/releases/download/v3.12.14/rabbitmq-server-generic-unix-3.12.14.tar.xz"
+
+build_cmd: ""
+start_cmd: "{{BASE_DIR}}/current/sbin/rabbitmq-server -detached"
+stop_cmd: "{{BASE_DIR}}/current/sbin/rabbitmqctl stop"
+status_cmd: "{{BASE_DIR}}/current/sbin/rabbitmqctl status"
+
+artifact_path: "external-package/rabbitmq.tar.xz"
+package_includes:
+  - sbin/
+  - plugins/
+  - etc/
+
+health_check:
+  type: tcp
+  target: ":{{PORT}}"
+  timeout: 60
+
+provision:
+  packages:
+    - erlang-nox
+  directories:
+    - "{{BASE_DIR}}/data"
+    - "{{BASE_DIR}}/logs"
+
+data_dirs:
+  - data
+
+log_file: "rabbit.log"

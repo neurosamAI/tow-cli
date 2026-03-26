@@ -1,0 +1,45 @@
+# Apache Kafka module handler
+# by neurosam.AI — https://neurosam.ai
+
+name: kafka
+description: Apache Kafka distributed event streaming platform
+version: "1.0.0"
+author: neurosam.AI
+
+package:
+  default_version: "3.7.0"
+  url_template: "https://downloads.apache.org/kafka/{{VERSION}}/kafka_2.13-{{VERSION}}.tgz"
+  versions:
+    "3.7.0": "https://downloads.apache.org/kafka/3.7.0/kafka_2.13-3.7.0.tgz"
+    "3.6.1": "https://downloads.apache.org/kafka/3.6.1/kafka_2.13-3.6.1.tgz"
+    "3.5.2": "https://downloads.apache.org/kafka/3.5.2/kafka_2.13-3.5.2.tgz"
+    "3.4.0": "https://downloads.apache.org/kafka/3.4.0/kafka_2.13-3.4.0.tgz"
+
+build_cmd: ""
+start_cmd: "{{BASE_DIR}}/current/bin/kafka-server-start.sh -daemon {{BASE_DIR}}/conf/server.properties"
+stop_cmd: "{{BASE_DIR}}/current/bin/kafka-server-stop.sh"
+status_cmd: "lsof -i :{{PORT}} -t 2>/dev/null"
+
+artifact_path: "external-package/kafka.tar.gz"
+package_includes:
+  - bin/
+  - libs/
+  - config/
+
+health_check:
+  type: tcp
+  target: ":{{PORT}}"
+  timeout: 60
+
+provision:
+  packages:
+    - openjdk-17-jre-headless
+  directories:
+    - "{{BASE_DIR}}/data/kafka-logs"
+  commands:
+    - "ulimit -n 65536 2>/dev/null || true"
+
+data_dirs:
+  - data/kafka-logs
+
+log_file: "server.log"

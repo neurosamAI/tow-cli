@@ -1,0 +1,44 @@
+# Elastic Kibana module handler
+# by neurosam.AI — https://neurosam.ai
+
+name: kibana
+description: Elastic Kibana data visualization and exploration dashboard
+version: "1.0.0"
+author: neurosam.AI
+
+package:
+  default_version: "8.17.0"
+  url_template: "https://artifacts.elastic.co/downloads/kibana/kibana-{{VERSION}}-linux-x86_64.tar.gz"
+  versions:
+    "8.17.0": "https://artifacts.elastic.co/downloads/kibana/kibana-8.17.0-linux-x86_64.tar.gz"
+    "8.15.4": "https://artifacts.elastic.co/downloads/kibana/kibana-8.15.4-linux-x86_64.tar.gz"
+    "7.17.25": "https://artifacts.elastic.co/downloads/kibana/kibana-7.17.25-linux-x86_64.tar.gz"
+
+build_cmd: ""
+start_cmd: "{{BASE_DIR}}/current/bin/kibana --port={{PORT}} --host=0.0.0.0 --config={{BASE_DIR}}/conf/kibana.yml &"
+stop_cmd: "kill $(lsof -i :{{PORT}} -t 2>/dev/null) 2>/dev/null || true"
+status_cmd: "lsof -i :{{PORT}} -t 2>/dev/null"
+
+artifact_path: "external-package/kibana.tar.gz"
+package_includes:
+  - bin/
+  - config/
+  - node/
+  - node_modules/
+  - src/
+
+health_check:
+  type: http
+  target: "http://localhost:{{PORT}}/api/status"
+  timeout: 120
+
+provision:
+  packages: []
+  directories:
+    - "{{BASE_DIR}}/data"
+  commands: []
+
+data_dirs:
+  - data
+
+log_file: "kibana.log"

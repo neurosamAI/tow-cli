@@ -1,0 +1,41 @@
+# Jenkins module handler
+# by neurosam.AI — https://neurosam.ai
+
+name: jenkins
+description: Jenkins open-source automation and CI/CD server
+version: "1.0.0"
+author: neurosam.AI
+
+package:
+  default_version: "2.492"
+  url_template: "https://get.jenkins.io/war-stable/{{VERSION}}/jenkins.war"
+  versions:
+    "2.492": "https://get.jenkins.io/war-stable/2.492/jenkins.war"
+    "2.479.2": "https://get.jenkins.io/war-stable/2.479.2/jenkins.war"
+    "2.462.3": "https://get.jenkins.io/war-stable/2.462.3/jenkins.war"
+
+build_cmd: ""
+start_cmd: "java -jar {{BASE_DIR}}/current/bin/jenkins.war --httpPort={{PORT}} --prefix=/ JENKINS_HOME={{BASE_DIR}}/data >> {{BASE_DIR}}/logs/jenkins.log 2>&1 &"
+stop_cmd: "kill $(lsof -i :{{PORT}} -t 2>/dev/null) 2>/dev/null || true"
+status_cmd: "lsof -i :{{PORT}} -t 2>/dev/null"
+
+artifact_path: "external-package/jenkins.tar.gz"
+package_includes:
+  - bin/
+
+health_check:
+  type: http
+  target: "http://localhost:{{PORT}}/login"
+  timeout: 120
+
+provision:
+  packages:
+    - openjdk-17-jre-headless
+  directories:
+    - "{{BASE_DIR}}/data"
+  commands: []
+
+data_dirs:
+  - data
+
+log_file: "jenkins.log"

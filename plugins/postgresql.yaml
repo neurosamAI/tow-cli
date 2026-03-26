@@ -1,0 +1,45 @@
+# PostgreSQL module handler
+# by neurosam.AI — https://neurosam.ai
+
+name: postgresql
+description: PostgreSQL advanced open-source relational database
+version: "1.0.0"
+author: neurosam.AI
+
+package:
+  default_version: "16.6"
+  url_template: "https://ftp.postgresql.org/pub/source/v{{VERSION}}/postgresql-{{VERSION}}.tar.gz"
+  versions:
+    "16.6": "https://ftp.postgresql.org/pub/source/v16.6/postgresql-16.6.tar.gz"
+    "15.10": "https://ftp.postgresql.org/pub/source/v15.10/postgresql-15.10.tar.gz"
+    "14.15": "https://ftp.postgresql.org/pub/source/v14.15/postgresql-14.15.tar.gz"
+
+build_cmd: "./configure --prefix={{BASE_DIR}}/current && make -j$(nproc) && make install"
+start_cmd: "{{BASE_DIR}}/current/bin/pg_ctl -D {{BASE_DIR}}/data -l {{BASE_DIR}}/logs/postgresql.log -o '-p {{PORT}}' start"
+stop_cmd: "{{BASE_DIR}}/current/bin/pg_ctl -D {{BASE_DIR}}/data stop -m fast"
+status_cmd: "lsof -i :{{PORT}} -t 2>/dev/null"
+
+artifact_path: "external-package/postgresql.tar.gz"
+package_includes:
+  - bin/
+  - lib/
+  - share/
+
+health_check:
+  type: tcp
+  target: ":{{PORT}}"
+  timeout: 60
+
+provision:
+  packages:
+    - libreadline-dev
+    - zlib1g-dev
+  directories:
+    - "{{BASE_DIR}}/data"
+  commands:
+    - "{{BASE_DIR}}/current/bin/initdb -D {{BASE_DIR}}/data 2>/dev/null || true"
+
+data_dirs:
+  - data
+
+log_file: "postgresql.log"

@@ -1,0 +1,45 @@
+# Keycloak module handler
+# by neurosam.AI — https://neurosam.ai
+
+name: keycloak
+description: Keycloak open-source identity and access management
+version: "1.0.0"
+author: neurosam.AI
+
+package:
+  default_version: "26.0.7"
+  url_template: "https://github.com/keycloak/keycloak/releases/download/{{VERSION}}/keycloak-{{VERSION}}.tar.gz"
+  versions:
+    "26.0.7": "https://github.com/keycloak/keycloak/releases/download/26.0.7/keycloak-26.0.7.tar.gz"
+    "25.0.6": "https://github.com/keycloak/keycloak/releases/download/25.0.6/keycloak-25.0.6.tar.gz"
+    "24.0.5": "https://github.com/keycloak/keycloak/releases/download/24.0.5/keycloak-24.0.5.tar.gz"
+
+build_cmd: ""
+start_cmd: "{{BASE_DIR}}/current/bin/kc.sh start-dev --http-port={{PORT}} --log-file={{BASE_DIR}}/logs/keycloak.log &"
+stop_cmd: "kill $(lsof -i :{{PORT}} -t 2>/dev/null) 2>/dev/null || true"
+status_cmd: "lsof -i :{{PORT}} -t 2>/dev/null"
+
+artifact_path: "external-package/keycloak.tar.gz"
+package_includes:
+  - bin/
+  - conf/
+  - lib/
+  - providers/
+  - themes/
+
+health_check:
+  type: http
+  target: "http://localhost:{{PORT}}/health/ready"
+  timeout: 120
+
+provision:
+  packages:
+    - openjdk-17-jre-headless
+  directories:
+    - "{{BASE_DIR}}/data"
+  commands: []
+
+data_dirs:
+  - data
+
+log_file: "keycloak.log"

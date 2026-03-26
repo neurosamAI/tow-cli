@@ -1,0 +1,50 @@
+# Apache Airflow module handler
+# by neurosam.AI — https://neurosam.ai
+
+name: airflow
+description: Apache Airflow workflow orchestration and scheduling platform
+version: "1.0.0"
+author: neurosam.AI
+
+package:
+  default_version: "2.10.4"
+  url_template: "https://github.com/apache/airflow/archive/refs/tags/{{VERSION}}.tar.gz"
+  versions:
+    "2.10.4": "https://github.com/apache/airflow/archive/refs/tags/2.10.4.tar.gz"
+    "2.9.3": "https://github.com/apache/airflow/archive/refs/tags/2.9.3.tar.gz"
+    "2.8.4": "https://github.com/apache/airflow/archive/refs/tags/2.8.4.tar.gz"
+
+build_cmd: "pip install apache-airflow=={{VERSION}} --prefix={{BASE_DIR}}/current"
+start_cmd: "AIRFLOW_HOME={{BASE_DIR}}/data {{BASE_DIR}}/current/bin/airflow standalone --port {{PORT}} >> {{BASE_DIR}}/logs/airflow.log 2>&1 &"
+stop_cmd: "kill $(lsof -i :{{PORT}} -t 2>/dev/null) 2>/dev/null || true"
+status_cmd: "lsof -i :{{PORT}} -t 2>/dev/null"
+
+artifact_path: "external-package/airflow.tar.gz"
+package_includes:
+  - bin/
+  - lib/
+
+health_check:
+  type: http
+  target: "http://localhost:{{PORT}}/health"
+  timeout: 120
+
+provision:
+  packages:
+    - python3
+    - python3-pip
+    - python3-venv
+    - libpq-dev
+  directories:
+    - "{{BASE_DIR}}/data"
+    - "{{BASE_DIR}}/data/dags"
+    - "{{BASE_DIR}}/data/logs"
+  commands:
+    - "export AIRFLOW_HOME={{BASE_DIR}}/data"
+
+data_dirs:
+  - data
+  - data/dags
+  - data/logs
+
+log_file: "airflow.log"

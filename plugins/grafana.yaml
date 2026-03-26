@@ -1,0 +1,42 @@
+# Grafana module handler
+# by neurosam.AI — https://neurosam.ai
+
+name: grafana
+description: Grafana observability dashboard
+version: "1.0.0"
+author: neurosam.AI
+
+package:
+  default_version: "10.4.1"
+  url_template: "https://dl.grafana.com/enterprise/release/grafana-enterprise-{{VERSION}}.linux-amd64.tar.gz"
+  versions:
+    "10.4.1": "https://dl.grafana.com/enterprise/release/grafana-enterprise-10.4.1.linux-amd64.tar.gz"
+    "10.3.5": "https://dl.grafana.com/enterprise/release/grafana-enterprise-10.3.5.linux-amd64.tar.gz"
+    "9.5.18": "https://dl.grafana.com/enterprise/release/grafana-enterprise-9.5.18.linux-amd64.tar.gz"
+
+build_cmd: ""
+start_cmd: "nohup {{BASE_DIR}}/current/bin/grafana-server --homepath={{BASE_DIR}}/current --config={{BASE_DIR}}/conf/grafana.ini > {{BASE_DIR}}/logs/grafana.log 2>&1 &"
+stop_cmd: "kill $(pgrep -f 'grafana-server.*{{BASE_DIR}}') 2>/dev/null || true"
+status_cmd: "curl -sf http://localhost:{{PORT}}/api/health | head -1"
+
+artifact_path: "external-package/grafana.tar.gz"
+package_includes:
+  - bin/
+  - conf/
+  - public/
+  - plugins-bundled/
+
+health_check:
+  type: http
+  target: "http://localhost:{{PORT}}/api/health"
+  timeout: 60
+
+provision:
+  directories:
+    - "{{BASE_DIR}}/data"
+    - "{{BASE_DIR}}/data/plugins"
+
+data_dirs:
+  - data
+
+log_file: "grafana.log"

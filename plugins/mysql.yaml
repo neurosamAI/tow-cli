@@ -1,0 +1,46 @@
+# MySQL module handler
+# by neurosam.AI — https://neurosam.ai
+
+name: mysql
+description: MySQL relational database management system
+version: "1.0.0"
+author: neurosam.AI
+
+package:
+  default_version: "8.4.3"
+  url_template: "https://dev.mysql.com/get/Downloads/MySQL-8.4/mysql-{{VERSION}}-linux-glibc2.28-x86_64.tar.xz"
+  versions:
+    "8.4.3": "https://dev.mysql.com/get/Downloads/MySQL-8.4/mysql-8.4.3-linux-glibc2.28-x86_64.tar.xz"
+    "8.0.40": "https://dev.mysql.com/get/Downloads/MySQL-8.0/mysql-8.0.40-linux-glibc2.28-x86_64.tar.xz"
+    "5.7.44": "https://dev.mysql.com/get/Downloads/MySQL-5.7/mysql-5.7.44-linux-glibc2.12-x86_64.tar.gz"
+
+build_cmd: ""
+start_cmd: "{{BASE_DIR}}/current/bin/mysqld --defaults-file={{BASE_DIR}}/conf/my.cnf --datadir={{BASE_DIR}}/data --port={{PORT}} --daemonize"
+stop_cmd: "{{BASE_DIR}}/current/bin/mysqladmin --defaults-file={{BASE_DIR}}/conf/my.cnf shutdown"
+status_cmd: "lsof -i :{{PORT}} -t 2>/dev/null"
+
+artifact_path: "external-package/mysql.tar.gz"
+package_includes:
+  - bin/
+  - lib/
+  - share/
+
+health_check:
+  type: tcp
+  target: ":{{PORT}}"
+  timeout: 60
+
+provision:
+  packages:
+    - libaio1
+    - libnuma1
+  directories:
+    - "{{BASE_DIR}}/data"
+    - "{{BASE_DIR}}/tmp"
+  commands:
+    - "{{BASE_DIR}}/current/bin/mysqld --initialize-insecure --datadir={{BASE_DIR}}/data --basedir={{BASE_DIR}}/current 2>/dev/null || true"
+
+data_dirs:
+  - data
+
+log_file: "mysqld.log"

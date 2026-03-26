@@ -1,0 +1,40 @@
+# Memcached module handler
+# by neurosam.AI — https://neurosam.ai
+
+name: memcached
+description: Memcached high-performance distributed memory caching system
+version: "1.0.0"
+author: neurosam.AI
+
+package:
+  default_version: "1.6.32"
+  url_template: "https://memcached.org/files/memcached-{{VERSION}}.tar.gz"
+  versions:
+    "1.6.32": "https://memcached.org/files/memcached-1.6.32.tar.gz"
+    "1.6.28": "https://memcached.org/files/memcached-1.6.28.tar.gz"
+    "1.6.22": "https://memcached.org/files/memcached-1.6.22.tar.gz"
+
+build_cmd: "./configure --prefix={{BASE_DIR}}/current && make -j$(nproc) && make install"
+start_cmd: "{{BASE_DIR}}/current/bin/memcached -d -p {{PORT}} -m 256 -l 127.0.0.1 -P {{BASE_DIR}}/memcached.pid"
+stop_cmd: "kill $(cat {{BASE_DIR}}/memcached.pid 2>/dev/null) 2>/dev/null || true"
+status_cmd: "lsof -i :{{PORT}} -t 2>/dev/null"
+
+artifact_path: "external-package/memcached.tar.gz"
+package_includes:
+  - bin/
+
+health_check:
+  type: tcp
+  target: ":{{PORT}}"
+  timeout: 10
+
+provision:
+  packages:
+    - libevent-dev
+  directories:
+    - "{{BASE_DIR}}/data"
+  commands: []
+
+data_dirs: []
+
+log_file: "memcached.log"

@@ -1,0 +1,41 @@
+# HashiCorp Consul module handler
+# by neurosam.AI — https://neurosam.ai
+
+name: consul
+description: HashiCorp Consul service discovery and configuration
+version: "1.0.0"
+author: neurosam.AI
+
+package:
+  default_version: "1.20.2"
+  url_template: "https://releases.hashicorp.com/consul/{{VERSION}}/consul_{{VERSION}}_linux_amd64.zip"
+  versions:
+    "1.20.2": "https://releases.hashicorp.com/consul/1.20.2/consul_1.20.2_linux_amd64.zip"
+    "1.19.3": "https://releases.hashicorp.com/consul/1.19.3/consul_1.19.3_linux_amd64.zip"
+    "1.18.3": "https://releases.hashicorp.com/consul/1.18.3/consul_1.18.3_linux_amd64.zip"
+
+build_cmd: ""
+start_cmd: "{{BASE_DIR}}/current/bin/consul agent -dev -data-dir={{BASE_DIR}}/data -client=0.0.0.0 -http-port={{PORT}} -log-file={{BASE_DIR}}/logs/consul.log &"
+stop_cmd: "{{BASE_DIR}}/current/bin/consul leave 2>/dev/null || kill $(lsof -i :{{PORT}} -t 2>/dev/null) 2>/dev/null || true"
+status_cmd: "lsof -i :{{PORT}} -t 2>/dev/null"
+
+artifact_path: "external-package/consul.tar.gz"
+package_includes:
+  - bin/
+
+health_check:
+  type: http
+  target: "http://localhost:{{PORT}}/v1/status/leader"
+  timeout: 30
+
+provision:
+  packages: []
+  directories:
+    - "{{BASE_DIR}}/data"
+  commands:
+    - "chmod +x {{BASE_DIR}}/current/bin/consul 2>/dev/null || true"
+
+data_dirs:
+  - data
+
+log_file: "consul.log"

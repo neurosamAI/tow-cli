@@ -1,0 +1,167 @@
+# Tow Configuration Example
+# This file defines your entire deployment topology.
+#
+# Environment variable interpolation: use ${VAR_NAME} anywhere in this file.
+# Local overrides: create tow.local.yaml to override settings per-machine
+# (add tow.local.yaml to .gitignore).
+
+project:
+  name: my-platform
+  version: "1.0.0"
+  base_dir: /app  # base directory on remote servers
+
+# Default values applied to all environments and modules
+defaults:
+  ssh_user: ec2-user
+  ssh_port: 22
+  ssh_key_path: ~/.ssh/my-key.pem
+  deploy_dir: deploy
+  health_check:
+    type: tcp
+    timeout: 300    # seconds
+    interval: 5     # seconds between checks
+    retries: 60
+
+# Environments define where you deploy
+environments:
+  dev:
+    ssh_user: ubuntu
+    ssh_key_path: ~/.ssh/dev-key.pem
+    servers:
+      - number: 1
+        host: 10.0.1.10
+        labels:
+          zone: ap-northeast-2a
+
+  test:
+    ssh_key_path: ~/.ssh/test-key.pem
+    branch: develop  # only allow deployment from 'develop' branch
+    servers:
+      - number: 1
+        host: 10.0.2.10
+        labels:
+          zone: ap-northeast-2a
+      - number: 2
+        host: 10.0.2.11
+        labels:
+          zone: ap-northeast-2c
+
+  prod:
+    ssh_key_path: ~/.ssh/prod-key.pem
+    branch: main  # only allow deployment from 'main' branch
+    servers:
+      - number: 1
+        host: ${PROD_SERVER_1}  # use env var for sensitive IPs
+        modules: [api-server, admin]  # only these modules run here
+        labels:
+          zone: ap-northeast-2a
+          role: app
+      - number: 2
+        host: ${PROD_SERVER_2}
+        modules: [api-server, admin]
+        labels:
+          zone: ap-northeast-2c
+          role: app
+      - number: 3
+        host: 10.0.3.20
+        modules: [kafka, redis, mongodb]
+        labels:
+          zone: ap-northeast-2a
+          role: infra
+
+# Deployment history retention
+retention:
+  keep: 5              # keep the 5 most recent deployments per module
+  auto_cleanup: true   # automatically remove old deployments after deploy/auto
+
+# Deployment notifications (optional)
+notifications:
+  - type: slack
+    url: ${SLACK_WEBHOOK_URL}
+  # - type: discord
+  #   url: ${DISCORD_WEBHOOK_URL}
+  # - type: telegram
+  #   url: ${TELEGRAM_BOT_TOKEN}    # Bot token (without "bot" prefix)
+  #   chat_id: ${TELEGRAM_CHAT_ID}  # Chat/group/channel ID
+  # - type: webhook
+  #   url: https://my-service.com/deploy-events
+
+# Modules define what you deploy
+modules:
+  api-server:
+    type: springboot
+    port: 8080
+    jmx_port: 19080
+    build_cmd: "./gradlew :api-server:clean :api-server:bootJar -Pprofile=${ENV}"
+    artifact_path: api-server/build/libs/api-server.jar
+    config_dir: api-server/config   # supports hierarchical: config/prod-1/ > config/prod/ > config/
+    log_path: /app/api-server/logs/application.log
+    data_dirs: [data, uploads]
+    health_check:
+      type: http
+      target: http://localhost:8080/actuator/health
+      timeout: 120
+      interval: 3
+    hooks:
+      pre_deploy: "echo 'Deploying api-server...'"
+      post_deploy: "curl -s http://localhost:8080/actuator/info"
+    variables:
+      JAVA_OPTS: "-Xms512m -Xmx800m -XX:+UseG1GC"
+      SPRING_PROFILES_ACTIVE: "${ENV}"
+
+  admin:
+    type: springboot
+    port: 8090
+    build_cmd: "./gradlew :admin:clean :admin:bootJar -Pprofile=${ENV}"
+    artifact_path: admin/build/libs/admin.jar
+    config_dir: admin/config
+    log_path: /app/admin/logs/application.log
+    health_check:
+      type: http
+      target: http://localhost:8090/actuator/health
+
+  schedule-server:
+    type: springboot
+    port: 8070
+    build_cmd: "./gradlew :schedule-server:clean :schedule-server:bootJar -Pprofile=${ENV}"
+    artifact_path: schedule-server/build/libs/schedule-server.jar
+    config_dir: schedule-server/config
+
+  kafka:
+    type: kafka
+    port: 9092
+    jmx_port: 19092
+    config_dir: kafka/config  # config/prod-1/server.properties, config/prod-2/server.properties...
+    start_cmd: "bin/kafka-server-start.sh -daemon /app/kafka/conf/server.properties"
+    stop_cmd: "bin/kafka-server-stop.sh"
+    data_dirs: [data/kafka-logs]
+    health_check:
+      type: tcp
+      timeout: 60
+
+  redis:
+    type: redis
+    port: 6379
+    config_dir: redis/config
+    data_dirs: [data]
+    health_check:
+      type: command
+      target: "/app/redis/current/bin/redis-cli ping"
+
+  mongodb:
+    type: generic
+    port: 27017
+    config_dir: mongodb/config
+    start_cmd: "mongod --config /app/mongodb/conf/mongod.conf --fork"
+    stop_cmd: "mongod --shutdown --dbpath /app/mongodb/data"
+    data_dirs: [data/db, data/log]
+    health_check:
+      type: command
+      target: "mongosh --eval 'db.runCommand({ping:1})' --quiet"
+    # Per-module SSH config (optional) — overrides environment-level SSH settings
+    # ssh:
+    #   user: mongoadmin
+    #   port: 2222
+    #   auth: key          # "key" (default), "password", or "agent"
+    #   key_path: ~/.ssh/mongo-key.pem
+    #   password: ${MONGO_SSH_PASS}  # only used when auth: password

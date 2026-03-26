@@ -1,0 +1,40 @@
+# etcd module handler
+# by neurosam.AI — https://neurosam.ai
+
+name: etcd
+description: etcd distributed reliable key-value store
+version: "1.0.0"
+author: neurosam.AI
+
+package:
+  default_version: "3.5.17"
+  url_template: "https://github.com/etcd-io/etcd/releases/download/v{{VERSION}}/etcd-v{{VERSION}}-linux-amd64.tar.gz"
+  versions:
+    "3.5.17": "https://github.com/etcd-io/etcd/releases/download/v3.5.17/etcd-v3.5.17-linux-amd64.tar.gz"
+    "3.5.12": "https://github.com/etcd-io/etcd/releases/download/v3.5.12/etcd-v3.5.12-linux-amd64.tar.gz"
+    "3.4.34": "https://github.com/etcd-io/etcd/releases/download/v3.4.34/etcd-v3.4.34-linux-amd64.tar.gz"
+
+build_cmd: ""
+start_cmd: "{{BASE_DIR}}/current/bin/etcd --data-dir={{BASE_DIR}}/data --listen-client-urls=http://0.0.0.0:{{PORT}} --advertise-client-urls=http://localhost:{{PORT}} &"
+stop_cmd: "kill $(lsof -i :{{PORT}} -t 2>/dev/null) 2>/dev/null || true"
+status_cmd: "lsof -i :{{PORT}} -t 2>/dev/null"
+
+artifact_path: "external-package/etcd.tar.gz"
+package_includes:
+  - bin/
+
+health_check:
+  type: http
+  target: "http://localhost:{{PORT}}/health"
+  timeout: 30
+
+provision:
+  packages: []
+  directories:
+    - "{{BASE_DIR}}/data"
+  commands: []
+
+data_dirs:
+  - data
+
+log_file: "etcd.log"

@@ -1,0 +1,42 @@
+# HashiCorp Vault module handler
+# by neurosam.AI — https://neurosam.ai
+
+name: vault
+description: HashiCorp Vault secrets management and data protection
+version: "1.0.0"
+author: neurosam.AI
+
+package:
+  default_version: "1.18.3"
+  url_template: "https://releases.hashicorp.com/vault/{{VERSION}}/vault_{{VERSION}}_linux_amd64.zip"
+  versions:
+    "1.18.3": "https://releases.hashicorp.com/vault/1.18.3/vault_1.18.3_linux_amd64.zip"
+    "1.17.6": "https://releases.hashicorp.com/vault/1.17.6/vault_1.17.6_linux_amd64.zip"
+    "1.16.3": "https://releases.hashicorp.com/vault/1.16.3/vault_1.16.3_linux_amd64.zip"
+
+build_cmd: ""
+start_cmd: "{{BASE_DIR}}/current/bin/vault server -config={{BASE_DIR}}/conf/vault.hcl &"
+stop_cmd: "kill $(lsof -i :{{PORT}} -t 2>/dev/null) 2>/dev/null || true"
+status_cmd: "lsof -i :{{PORT}} -t 2>/dev/null"
+
+artifact_path: "external-package/vault.tar.gz"
+package_includes:
+  - bin/
+
+health_check:
+  type: http
+  target: "http://localhost:{{PORT}}/v1/sys/health"
+  timeout: 30
+
+provision:
+  packages: []
+  directories:
+    - "{{BASE_DIR}}/data"
+  commands:
+    - "chmod +x {{BASE_DIR}}/current/bin/vault 2>/dev/null || true"
+    - "setcap cap_ipc_lock=+ep {{BASE_DIR}}/current/bin/vault 2>/dev/null || true"
+
+data_dirs:
+  - data
+
+log_file: "vault.log"

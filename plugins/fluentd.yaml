@@ -1,0 +1,47 @@
+# Fluentd module handler
+# by neurosam.AI — https://neurosam.ai
+
+name: fluentd
+description: Fluentd unified logging layer and data collector
+version: "1.0.0"
+author: neurosam.AI
+
+package:
+  default_version: "1.17.1"
+  url_template: "https://github.com/fluent/fluentd/archive/refs/tags/v{{VERSION}}.tar.gz"
+  versions:
+    "1.17.1": "https://github.com/fluent/fluentd/archive/refs/tags/v1.17.1.tar.gz"
+    "1.16.6": "https://github.com/fluent/fluentd/archive/refs/tags/v1.16.6.tar.gz"
+    "1.15.3": "https://github.com/fluent/fluentd/archive/refs/tags/v1.15.3.tar.gz"
+
+build_cmd: "gem install fluentd --install-dir={{BASE_DIR}}/current/lib --no-document"
+start_cmd: "{{BASE_DIR}}/current/bin/fluentd -c {{BASE_DIR}}/conf/fluent.conf -d {{BASE_DIR}}/fluentd.pid --log={{BASE_DIR}}/logs/fluentd.log"
+stop_cmd: "kill $(cat {{BASE_DIR}}/fluentd.pid 2>/dev/null) 2>/dev/null || true"
+status_cmd: "kill -0 $(cat {{BASE_DIR}}/fluentd.pid 2>/dev/null) 2>/dev/null && echo running"
+
+artifact_path: "external-package/fluentd.tar.gz"
+package_includes:
+  - bin/
+  - lib/
+  - etc/
+
+health_check:
+  type: tcp
+  target: ":{{PORT}}"
+  timeout: 30
+
+provision:
+  packages:
+    - ruby
+    - ruby-dev
+    - build-essential
+  directories:
+    - "{{BASE_DIR}}/data"
+    - "{{BASE_DIR}}/data/buffer"
+  commands: []
+
+data_dirs:
+  - data
+  - data/buffer
+
+log_file: "fluentd.log"

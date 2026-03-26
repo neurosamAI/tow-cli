@@ -1,0 +1,46 @@
+# MongoDB module handler
+# by neurosam.AI — https://neurosam.ai
+
+name: mongodb
+description: MongoDB document database
+version: "1.0.0"
+author: neurosam.AI
+
+package:
+  default_version: "7.0.8"
+  url_template: "https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-ubuntu2204-{{VERSION}}.tgz"
+  versions:
+    "7.0.8": "https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-ubuntu2204-7.0.8.tgz"
+    "6.0.15": "https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-ubuntu2204-6.0.15.tgz"
+
+build_cmd: ""
+start_cmd: "{{BASE_DIR}}/current/bin/mongod --config {{BASE_DIR}}/conf/mongod.conf --fork"
+stop_cmd: "{{BASE_DIR}}/current/bin/mongod --shutdown --dbpath {{BASE_DIR}}/data/db"
+status_cmd: "{{BASE_DIR}}/current/bin/mongosh --eval 'db.runCommand({ping:1})' --quiet 2>/dev/null && echo 'RUNNING' || echo 'STOPPED'"
+
+artifact_path: "external-package/mongodb.tgz"
+package_includes:
+  - bin/
+  - config/
+
+health_check:
+  type: command
+  target: "{{BASE_DIR}}/current/bin/mongosh --eval 'db.runCommand({ping:1})' --quiet"
+  timeout: 60
+
+provision:
+  packages:
+    - libcurl4
+    - openssl
+    - liblzma5
+  directories:
+    - "{{BASE_DIR}}/data/db"
+    - "{{BASE_DIR}}/data/log"
+  commands:
+    - "ulimit -n 64000 2>/dev/null || true"
+
+data_dirs:
+  - data/db
+  - data/log
+
+log_file: "mongod.log"

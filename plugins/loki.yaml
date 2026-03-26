@@ -1,0 +1,41 @@
+# Grafana Loki module handler
+# by neurosam.AI — https://neurosam.ai
+
+name: loki
+description: Grafana Loki — horizontally-scalable log aggregation system
+version: "1.0.0"
+author: neurosam.AI
+
+package:
+  default_version: "2.9.4"
+  url_template: "https://github.com/grafana/loki/releases/download/v{{VERSION}}/loki-linux-amd64.zip"
+  versions:
+    "2.9.4": "https://github.com/grafana/loki/releases/download/v2.9.4/loki-linux-amd64.zip"
+    "2.9.3": "https://github.com/grafana/loki/releases/download/v2.9.3/loki-linux-amd64.zip"
+    "2.8.7": "https://github.com/grafana/loki/releases/download/v2.8.7/loki-linux-amd64.zip"
+
+build_cmd: ""
+start_cmd: "nohup {{BASE_DIR}}/current/loki-linux-amd64 -config.file={{BASE_DIR}}/conf/local-config.yaml > {{BASE_DIR}}/logs/loki.log 2>&1 &"
+stop_cmd: "kill $(pgrep -f 'loki.*{{BASE_DIR}}') 2>/dev/null || true"
+status_cmd: "curl -sf http://localhost:{{PORT}}/ready"
+
+artifact_path: "external-package/loki.zip"
+package_includes:
+  - loki-linux-amd64
+
+health_check:
+  type: http
+  target: "http://localhost:{{PORT}}/ready"
+  timeout: 60
+
+provision:
+  directories:
+    - "{{BASE_DIR}}/data"
+    - "{{BASE_DIR}}/data/chunks"
+    - "{{BASE_DIR}}/data/boltdb-shipper-active"
+    - "{{BASE_DIR}}/data/boltdb-shipper-cache"
+
+data_dirs:
+  - data
+
+log_file: "loki.log"

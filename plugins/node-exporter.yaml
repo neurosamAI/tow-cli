@@ -1,0 +1,33 @@
+# Prometheus Node Exporter module handler
+# by neurosam.AI — https://neurosam.ai
+
+name: node-exporter
+description: Prometheus Node Exporter for hardware and OS metrics
+version: "1.0.0"
+author: neurosam.AI
+
+package:
+  default_version: "1.7.0"
+  url_template: "https://github.com/prometheus/node_exporter/releases/download/v{{VERSION}}/node_exporter-{{VERSION}}.linux-amd64.tar.gz"
+  versions:
+    "1.7.0": "https://github.com/prometheus/node_exporter/releases/download/v1.7.0/node_exporter-1.7.0.linux-amd64.tar.gz"
+    "1.6.1": "https://github.com/prometheus/node_exporter/releases/download/v1.6.1/node_exporter-1.6.1.linux-amd64.tar.gz"
+    "1.5.0": "https://github.com/prometheus/node_exporter/releases/download/v1.5.0/node_exporter-1.5.0.linux-amd64.tar.gz"
+
+build_cmd: ""
+start_cmd: "nohup {{BASE_DIR}}/current/node_exporter --web.listen-address=:{{PORT}} > {{BASE_DIR}}/logs/node-exporter.log 2>&1 &"
+stop_cmd: "kill $(pgrep -f 'node_exporter.*{{BASE_DIR}}') 2>/dev/null || true"
+status_cmd: "curl -sf http://localhost:{{PORT}}/metrics | head -1"
+
+artifact_path: "external-package/node-exporter.tar.gz"
+package_includes:
+  - node_exporter
+
+health_check:
+  type: tcp
+  target: ":{{PORT}}"
+  timeout: 30
+
+data_dirs: []
+
+log_file: "node-exporter.log"

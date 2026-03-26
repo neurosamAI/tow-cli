@@ -1,0 +1,41 @@
+# Binaries
+/bin/
+/dist/
+/tow
+*.exe
+
+# Build
+/build/
+
+# Go
+vendor/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Credentials (never commit these)
+*.pem
+*.key
+credentials.*
+
+# Tow local config
+tow.local.yaml
+
+# Coverage
+coverage.out
+
+# Tow audit log (generated at runtime)
+.tow/
+
+# Jekyll (docs)
+docs/_site/
+docs/.jekyll-cache/
+docs/.jekyll-metadata

@@ -1,0 +1,41 @@
+# Nginx module handler
+# by neurosam.AI — https://neurosam.ai
+
+name: nginx
+description: Nginx web server / reverse proxy
+version: "1.0.0"
+author: neurosam.AI
+
+package:
+  default_version: "1.25.4"
+  url_template: "https://nginx.org/download/nginx-{{VERSION}}.tar.gz"
+  versions:
+    "1.25.4": "https://nginx.org/download/nginx-1.25.4.tar.gz"
+    "1.24.0": "https://nginx.org/download/nginx-1.24.0.tar.gz"
+
+build_cmd: ""
+start_cmd: "{{BASE_DIR}}/current/sbin/nginx -c {{BASE_DIR}}/conf/nginx.conf"
+stop_cmd: "{{BASE_DIR}}/current/sbin/nginx -s stop"
+status_cmd: "{{BASE_DIR}}/current/sbin/nginx -s reload 2>&1 && echo 'RUNNING' || echo 'STOPPED'"
+
+artifact_path: "external-package/nginx.tar.gz"
+package_includes:
+  - sbin/
+  - conf/
+  - html/
+
+health_check:
+  type: http
+  target: "http://localhost:{{PORT}}/health"
+  timeout: 30
+
+provision:
+  packages:
+    - libpcre3-dev
+    - zlib1g-dev
+    - libssl-dev
+  directories:
+    - "{{BASE_DIR}}/logs"
+    - "{{BASE_DIR}}/tmp"
+
+log_file: "access.log"

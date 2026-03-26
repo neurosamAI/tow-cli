@@ -1,0 +1,47 @@
+{
+  "name": "@neurosamai/tow",
+  "version": "0.1.0",
+  "description": "Lightweight, agentless deployment orchestrator for bare-metal servers and VMs",
+  "author": "Murry Jeong <oss@neurosam.ai> (https://github.com/comchangs)",
+  "license": "MIT",
+  "homepage": "https://tow-cli.neurosam.ai",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/neurosamAI/tow-cli"
+  },
+  "keywords": [
+    "deploy",
+    "deployment",
+    "ssh",
+    "devops",
+    "orchestrator",
+    "bare-metal",
+    "vm",
+    "rollback",
+    "symlink",
+    "agentless"
+  ],
+  "bin": {
+    "tow": "bin/tow"
+  },
+  "scripts": {
+    "postinstall": "node install.js"
+  },
+  "files": [
+    "bin/",
+    "install.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "os": [
+    "darwin",
+    "linux"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ],
+  "engines": {
+    "node": ">=16"
+  }
+}

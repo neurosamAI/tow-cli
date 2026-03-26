@@ -1,0 +1,45 @@
+# Elastic Logstash module handler
+# by neurosam.AI — https://neurosam.ai
+
+name: logstash
+description: Elastic Logstash server-side data processing pipeline
+version: "1.0.0"
+author: neurosam.AI
+
+package:
+  default_version: "8.17.0"
+  url_template: "https://artifacts.elastic.co/downloads/logstash/logstash-{{VERSION}}-linux-x86_64.tar.gz"
+  versions:
+    "8.17.0": "https://artifacts.elastic.co/downloads/logstash/logstash-8.17.0-linux-x86_64.tar.gz"
+    "8.15.4": "https://artifacts.elastic.co/downloads/logstash/logstash-8.15.4-linux-x86_64.tar.gz"
+    "7.17.25": "https://artifacts.elastic.co/downloads/logstash/logstash-7.17.25-linux-x86_64.tar.gz"
+
+build_cmd: ""
+start_cmd: "{{BASE_DIR}}/current/bin/logstash -f {{BASE_DIR}}/conf/logstash.conf --path.data={{BASE_DIR}}/data --path.logs={{BASE_DIR}}/logs --api.http.port={{PORT}} &"
+stop_cmd: "kill $(lsof -i :{{PORT}} -t 2>/dev/null) 2>/dev/null || true"
+status_cmd: "lsof -i :{{PORT}} -t 2>/dev/null"
+
+artifact_path: "external-package/logstash.tar.gz"
+package_includes:
+  - bin/
+  - lib/
+  - config/
+  - logstash-core/
+
+health_check:
+  type: http
+  target: "http://localhost:{{PORT}}/"
+  timeout: 120
+
+provision:
+  packages:
+    - openjdk-17-jre-headless
+  directories:
+    - "{{BASE_DIR}}/data"
+  commands:
+    - "ulimit -n 65536 2>/dev/null || true"
+
+data_dirs:
+  - data
+
+log_file: "logstash-plain.log"

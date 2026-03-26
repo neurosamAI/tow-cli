@@ -1,0 +1,44 @@
+# Apache ZooKeeper module handler
+# by neurosam.AI — https://neurosam.ai
+
+name: zookeeper
+description: Apache ZooKeeper distributed coordination service
+version: "1.0.0"
+author: neurosam.AI
+
+package:
+  default_version: "3.9.2"
+  url_template: "https://downloads.apache.org/zookeeper/zookeeper-{{VERSION}}/apache-zookeeper-{{VERSION}}-bin.tar.gz"
+  versions:
+    "3.9.2": "https://downloads.apache.org/zookeeper/zookeeper-3.9.2/apache-zookeeper-3.9.2-bin.tar.gz"
+    "3.8.4": "https://downloads.apache.org/zookeeper/zookeeper-3.8.4/apache-zookeeper-3.8.4-bin.tar.gz"
+    "3.7.2": "https://downloads.apache.org/zookeeper/zookeeper-3.7.2/apache-zookeeper-3.7.2-bin.tar.gz"
+
+build_cmd: ""
+start_cmd: "{{BASE_DIR}}/current/bin/zkServer.sh start {{BASE_DIR}}/conf/zoo.cfg"
+stop_cmd: "{{BASE_DIR}}/current/bin/zkServer.sh stop {{BASE_DIR}}/conf/zoo.cfg"
+status_cmd: "lsof -i :{{PORT}} -t 2>/dev/null"
+
+artifact_path: "external-package/zookeeper.tar.gz"
+package_includes:
+  - bin/
+  - lib/
+  - conf/
+
+health_check:
+  type: tcp
+  target: ":{{PORT}}"
+  timeout: 30
+
+provision:
+  packages:
+    - openjdk-17-jre-headless
+  directories:
+    - "{{BASE_DIR}}/data/zookeeper"
+  commands:
+    - "ulimit -n 65536 2>/dev/null || true"
+
+data_dirs:
+  - data/zookeeper
+
+log_file: "zookeeper.log"

@@ -1,0 +1,40 @@
+# MinIO module handler
+# by neurosam.AI — https://neurosam.ai
+
+name: minio
+description: MinIO high-performance S3-compatible object storage
+version: "1.0.0"
+author: neurosam.AI
+
+package:
+  default_version: "20250207232608"
+  url_template: "https://dl.min.io/server/minio/release/linux-amd64/archive/minio.RELEASE.2025-02-07T23-26-08Z"
+  versions:
+    "20250207232608": "https://dl.min.io/server/minio/release/linux-amd64/archive/minio.RELEASE.2025-02-07T23-26-08Z"
+    "20241113093929": "https://dl.min.io/server/minio/release/linux-amd64/archive/minio.RELEASE.2024-11-13T09-39-29Z"
+
+build_cmd: ""
+start_cmd: "MINIO_ROOT_USER=minioadmin MINIO_ROOT_PASSWORD=minioadmin {{BASE_DIR}}/current/bin/minio server {{BASE_DIR}}/data --address :{{PORT}} --console-address :{{CONSOLE_PORT}} &"
+stop_cmd: "kill $(lsof -i :{{PORT}} -t 2>/dev/null) 2>/dev/null || true"
+status_cmd: "lsof -i :{{PORT}} -t 2>/dev/null"
+
+artifact_path: "external-package/minio.tar.gz"
+package_includes:
+  - bin/
+
+health_check:
+  type: http
+  target: "http://localhost:{{PORT}}/minio/health/live"
+  timeout: 30
+
+provision:
+  packages: []
+  directories:
+    - "{{BASE_DIR}}/data"
+  commands:
+    - "chmod +x {{BASE_DIR}}/current/bin/minio 2>/dev/null || true"
+
+data_dirs:
+  - data
+
+log_file: "minio.log"

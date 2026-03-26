@@ -1,0 +1,43 @@
+# HAProxy module handler
+# by neurosam.AI — https://neurosam.ai
+
+name: haproxy
+description: HAProxy reliable high-performance TCP/HTTP load balancer
+version: "1.0.0"
+author: neurosam.AI
+
+package:
+  default_version: "3.0.7"
+  url_template: "https://www.haproxy.org/download/3.0/src/haproxy-{{VERSION}}.tar.gz"
+  versions:
+    "3.0.7": "https://www.haproxy.org/download/3.0/src/haproxy-3.0.7.tar.gz"
+    "2.8.12": "https://www.haproxy.org/download/2.8/src/haproxy-2.8.12.tar.gz"
+    "2.6.18": "https://www.haproxy.org/download/2.6/src/haproxy-2.6.18.tar.gz"
+
+build_cmd: "make -j$(nproc) TARGET=linux-glibc USE_OPENSSL=1 USE_PCRE=1 PREFIX={{BASE_DIR}}/current && make install PREFIX={{BASE_DIR}}/current"
+start_cmd: "{{BASE_DIR}}/current/sbin/haproxy -f {{BASE_DIR}}/conf/haproxy.cfg -D -p {{BASE_DIR}}/haproxy.pid"
+stop_cmd: "kill $(cat {{BASE_DIR}}/haproxy.pid 2>/dev/null) 2>/dev/null || true"
+status_cmd: "lsof -i :{{PORT}} -t 2>/dev/null"
+
+artifact_path: "external-package/haproxy.tar.gz"
+package_includes:
+  - sbin/
+  - share/
+
+health_check:
+  type: tcp
+  target: ":{{PORT}}"
+  timeout: 15
+
+provision:
+  packages:
+    - libssl-dev
+    - libpcre3-dev
+  directories:
+    - "{{BASE_DIR}}/data"
+  commands:
+    - "sysctl -w net.ipv4.ip_nonlocal_bind=1 2>/dev/null || true"
+
+data_dirs: []
+
+log_file: "haproxy.log"

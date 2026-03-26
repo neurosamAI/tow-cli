@@ -1,0 +1,45 @@
+# Kafka Connect (Distributed Mode) module handler
+# by neurosam.AI — https://neurosam.ai
+
+name: kafka-connect
+description: Apache Kafka Connect distributed mode for streaming data pipelines
+version: "1.0.0"
+author: neurosam.AI
+
+package:
+  default_version: "3.7.0"
+  url_template: "https://downloads.apache.org/kafka/{{VERSION}}/kafka_2.13-{{VERSION}}.tgz"
+  versions:
+    "3.7.0": "https://downloads.apache.org/kafka/3.7.0/kafka_2.13-3.7.0.tgz"
+    "3.6.1": "https://downloads.apache.org/kafka/3.6.1/kafka_2.13-3.6.1.tgz"
+    "3.4.0": "https://downloads.apache.org/kafka/3.4.0/kafka_2.13-3.4.0.tgz"
+
+build_cmd: ""
+start_cmd: "{{BASE_DIR}}/current/bin/connect-distributed.sh -daemon {{BASE_DIR}}/conf/connect-distributed.properties"
+stop_cmd: "kill $(pgrep -f 'ConnectDistributed.*{{BASE_DIR}}') 2>/dev/null || true"
+status_cmd: "curl -sf http://localhost:{{PORT}}/connectors | head -1"
+
+artifact_path: "external-package/kafka-connect.tar.gz"
+package_includes:
+  - bin/
+  - libs/
+  - config/
+
+health_check:
+  type: http
+  target: "http://localhost:{{PORT}}/connectors"
+  timeout: 60
+
+provision:
+  packages:
+    - openjdk-17-jre-headless
+  directories:
+    - "{{BASE_DIR}}/data"
+    - "{{BASE_DIR}}/plugins"
+  commands:
+    - "ulimit -n 65536 2>/dev/null || true"
+
+data_dirs:
+  - data
+
+log_file: "connect.log"

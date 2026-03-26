@@ -1,0 +1,51 @@
+<!-- Tow Deploy — JetBrains Plugin by neurosam.AI -->
+<idea-plugin>
+    <id>ai.neurosam.tow</id>
+    <name>Tow Deploy</name>
+    <vendor email="oss@neurosam.ai" url="https://github.com/comchangs">Murry Jeong (comchangs) / neurosam.AI</vendor>
+
+    <description><![CDATA[
+    <p>Deploy to bare-metal servers and VMs directly from your JetBrains IDE.</p>
+    <ul>
+      <li>Sidebar panel with environments, modules, and deployment history</li>
+      <li>One-click deploy, rollback, status, and log streaming</li>
+      <li>Terminal integration for all Tow commands</li>
+    </ul>
+    <p>Requires <a href="https://github.com/neurosamAI/tow-cli">Tow CLI</a> installed.</p>
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>org.jetbrains.plugins.terminal</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <toolWindow id="Tow"
+                    anchor="right"
+                    factoryClass="ai.neurosam.tow.TowToolWindowFactory"
+                    icon="/icons/tow.svg"/>
+    </extensions>
+
+    <actions>
+        <group id="Tow.Actions" text="Tow" popup="true">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+            <action id="Tow.Deploy" class="ai.neurosam.tow.actions.DeployAction"
+                    text="Deploy Module" description="Deploy a module to an environment"
+                    icon="AllIcons.Actions.Execute"/>
+            <action id="Tow.Auto" class="ai.neurosam.tow.actions.AutoDeployAction"
+                    text="Auto Deploy" description="Full pipeline: build → deploy"
+                    icon="AllIcons.Actions.RunAll"/>
+            <action id="Tow.Rollback" class="ai.neurosam.tow.actions.RollbackAction"
+                    text="Rollback" description="Rollback to previous deployment"
+                    icon="AllIcons.Actions.Rollback"/>
+            <action id="Tow.Status" class="ai.neurosam.tow.actions.StatusAction"
+                    text="Check Status" description="Check module status"
+                    icon="AllIcons.Debugger.ThreadStates.Idle"/>
+            <action id="Tow.Logs" class="ai.neurosam.tow.actions.LogsAction"
+                    text="Stream Logs" description="Stream remote logs"
+                    icon="AllIcons.Debugger.Console"/>
+        </group>
+
+        <group id="Tow.Shortcuts" text="Tow Shortcuts">
+            <add-to-group group-id="MainToolBar" anchor="last"/>
+        </group>
+    </actions>
+</idea-plugin>

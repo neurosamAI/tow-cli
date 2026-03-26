@@ -1,0 +1,42 @@
+# Redis module handler
+# by neurosam.AI — https://neurosam.ai
+
+name: redis
+description: Redis in-memory data store
+version: "1.0.0"
+author: neurosam.AI
+
+package:
+  default_version: "7.2.4"
+  url_template: "https://download.redis.io/releases/redis-{{VERSION}}.tar.gz"
+  versions:
+    "7.2.4": "https://download.redis.io/releases/redis-7.2.4.tar.gz"
+    "7.0.15": "https://download.redis.io/releases/redis-7.0.15.tar.gz"
+    "6.2.14": "https://download.redis.io/releases/redis-6.2.14.tar.gz"
+
+build_cmd: ""
+start_cmd: "{{BASE_DIR}}/current/bin/redis-server {{BASE_DIR}}/conf/redis.conf --port {{PORT}} --daemonize yes"
+stop_cmd: "{{BASE_DIR}}/current/bin/redis-cli -p {{PORT}} shutdown"
+status_cmd: "{{BASE_DIR}}/current/bin/redis-cli -p {{PORT}} ping"
+
+artifact_path: "external-package/redis.tar.gz"
+package_includes:
+  - bin/
+  - config/
+
+health_check:
+  type: command
+  target: "{{BASE_DIR}}/current/bin/redis-cli -p {{PORT}} ping | grep PONG"
+  timeout: 30
+
+provision:
+  directories:
+    - "{{BASE_DIR}}/data"
+  commands:
+    - "sysctl -w vm.overcommit_memory=1 2>/dev/null || true"
+    - "sysctl -w net.core.somaxconn=511 2>/dev/null || true"
+
+data_dirs:
+  - data
+
+log_file: "redis.log"

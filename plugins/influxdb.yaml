@@ -1,0 +1,42 @@
+# InfluxDB module handler
+# by neurosam.AI — https://neurosam.ai
+
+name: influxdb
+description: InfluxDB high-performance time-series database
+version: "1.0.0"
+author: neurosam.AI
+
+package:
+  default_version: "2.7.10"
+  url_template: "https://dl.influxdata.com/influxdb/releases/influxdb2-{{VERSION}}_linux_amd64.tar.gz"
+  versions:
+    "2.7.10": "https://dl.influxdata.com/influxdb/releases/influxdb2-2.7.10_linux_amd64.tar.gz"
+    "2.7.6": "https://dl.influxdata.com/influxdb/releases/influxdb2-2.7.6_linux_amd64.tar.gz"
+    "2.7.3": "https://dl.influxdata.com/influxdb/releases/influxdb2-2.7.3_linux_amd64.tar.gz"
+
+build_cmd: ""
+start_cmd: "{{BASE_DIR}}/current/bin/influxd --bolt-path={{BASE_DIR}}/data/influxd.bolt --engine-path={{BASE_DIR}}/data/engine --http-bind-address=:{{PORT}} >> {{BASE_DIR}}/logs/influxdb.log 2>&1 &"
+stop_cmd: "kill $(lsof -i :{{PORT}} -t 2>/dev/null) 2>/dev/null || true"
+status_cmd: "lsof -i :{{PORT}} -t 2>/dev/null"
+
+artifact_path: "external-package/influxdb.tar.gz"
+package_includes:
+  - bin/
+
+health_check:
+  type: http
+  target: "http://localhost:{{PORT}}/health"
+  timeout: 30
+
+provision:
+  packages: []
+  directories:
+    - "{{BASE_DIR}}/data"
+    - "{{BASE_DIR}}/data/engine"
+  commands: []
+
+data_dirs:
+  - data
+  - data/engine
+
+log_file: "influxdb.log"

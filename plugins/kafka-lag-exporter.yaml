@@ -1,0 +1,37 @@
+# Kafka Lag Exporter module handler
+# by neurosam.AI — https://neurosam.ai
+
+name: kafka-lag-exporter
+description: Kafka consumer group lag monitoring exporter for Prometheus
+version: "1.0.0"
+author: neurosam.AI
+
+package:
+  default_version: "0.8.2"
+  url_template: "https://github.com/seglo/kafka-lag-exporter/releases/download/v{{VERSION}}/kafka-lag-exporter-{{VERSION}}.zip"
+  versions:
+    "0.8.2": "https://github.com/seglo/kafka-lag-exporter/releases/download/v0.8.2/kafka-lag-exporter-0.8.2.zip"
+    "0.7.1": "https://github.com/seglo/kafka-lag-exporter/releases/download/v0.7.1/kafka-lag-exporter-0.7.1.zip"
+
+build_cmd: ""
+start_cmd: "nohup {{BASE_DIR}}/current/bin/kafka-lag-exporter -Dconfig.file={{BASE_DIR}}/conf/application.conf -Dhttp.port={{PORT}} > {{BASE_DIR}}/logs/kafka-lag-exporter.log 2>&1 &"
+stop_cmd: "kill $(pgrep -f 'kafka-lag-exporter.*{{BASE_DIR}}') 2>/dev/null || true"
+status_cmd: "curl -sf http://localhost:{{PORT}}/metrics | head -1"
+
+artifact_path: "external-package/kafka-lag-exporter.zip"
+package_includes:
+  - bin/
+  - lib/
+
+health_check:
+  type: tcp
+  target: ":{{PORT}}"
+  timeout: 60
+
+provision:
+  packages:
+    - openjdk-11-jre-headless
+
+data_dirs: []
+
+log_file: "kafka-lag-exporter.log"
