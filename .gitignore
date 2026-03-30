@@ -39,3 +39,8 @@ coverage.out
 docs/public/
 docs/resources/
 docs/.hugo_build.lock
+
+# Node.js (VS Code extension)
+integrations/vscode/node_modules/
+integrations/vscode/out/
+integrations/vscode/*.vsix
