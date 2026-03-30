@@ -145,3 +145,23 @@ jobs:
           cp ../../README.md .
 
           npm publish --access public
+
+  vscode:
+    name: Publish VS Code Extension
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build and publish
+        working-directory: integrations/vscode
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: |
+          npm install
+          npx @vscode/vsce publish -p $VSCE_PAT
