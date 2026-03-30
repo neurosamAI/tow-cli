@@ -241,7 +241,16 @@ tow status -o json            # Machine-readable JSON output
 | `elixir` | `mix deps.get, compile, release` | TCP port check |
 | `generic` | — | TCP port check |
 
-Infrastructure services are supported via [35 YAML plugins](plugins/) — Kafka, Redis, MySQL, PostgreSQL, MongoDB, Elasticsearch, ZooKeeper, Nginx, Prometheus, Grafana, Loki, Vault, Jenkins, and more. Community can add new services without writing Go code.
+Infrastructure services are supported via [35 bundled YAML plugins](plugins/) — Kafka, Redis, MySQL, PostgreSQL, MongoDB, Elasticsearch, ZooKeeper, Nginx, Prometheus, Grafana, Loki, Vault, Jenkins, and more.
+
+Community plugins can be installed from GitHub:
+
+```bash
+tow plugin add someuser/tow-plugin-mssql          # GitHub repo
+tow plugin add myorg/infra-plugins/oracle.yaml     # specific file
+tow plugin add https://example.com/custom.yaml     # any URL
+tow plugin list                                     # list all (bundled + external)
+```
 
 ## Documentation
 

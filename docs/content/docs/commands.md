@@ -271,6 +271,55 @@ Sends `kill -3` to the JVM process. Thread dump output is written to the applica
 
 > Only available for modules with type `springboot` or `java`.
 
+### `tow plugin`
+
+Manage infrastructure plugins.
+
+```bash
+# List all installed plugins (bundled + external)
+tow plugin list
+
+# Install bundled plugins to ~/.tow/plugins/ (for customization)
+tow plugin install kafka redis
+tow plugin install --all
+
+# Add community plugins from GitHub or URL
+tow plugin add someuser/tow-plugin-mssql
+tow plugin add myorg/infra-plugins/oracle.yaml
+tow plugin add https://example.com/my-plugin.yaml
+
+# Remove
+tow plugin remove mssql
+```
+
+35 plugins are bundled in the binary. Community plugins are installed to `~/.tow/plugins/`.
+
+See [plugins/README.md](https://github.com/neurosamAI/tow-cli/tree/main/plugins) for the full list and plugin authoring guide.
+
+---
+
+### `tow doctor`
+
+Pre-flight diagnostics — checks config, SSH, remote directories, disk space, and deploy locks.
+
+```bash
+tow doctor -e prod -m api-server --insecure
+
+  ✓ tow.yaml is valid
+  ✓ Environment 'prod' exists
+  ✓ SSH key exists
+  ✓ Servers configured (22)
+  ✓ SSH connection to 10.0.1.10
+  ✓ Remote dir exists: /home/ec2-user/api-server-1
+  ✓ Disk space — Available: 15GB
+  ✓ Branch policy
+  ✓ No active deploy lock
+```
+
+Run without `-m` to check environment-level connectivity.
+
+---
+
 ### `tow mcp-server`
 
 Start the MCP (Model Context Protocol) server for AI agent integration.

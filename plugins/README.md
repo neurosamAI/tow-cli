@@ -6,20 +6,43 @@ YAML-based module handler plugins for infrastructure services. Add support for a
 
 ## How It Works
 
-```
-./plugins/              # Project-level (committed to git)
-~/.tow/plugins/         # Global (personal, all projects)
-```
-
-Tow automatically loads all `.yaml` files from these directories at startup.
+35 plugins are **bundled in the tow binary** — no separate installation needed. Just set the type:
 
 ```yaml
-# tow.yaml — just set the type to the plugin name
+# tow.yaml
 modules:
   my-db:
     type: postgresql
     port: 5432
 ```
+
+### Community Plugins
+
+Install plugins from GitHub repos or URLs:
+
+```bash
+# From GitHub repo
+tow plugin add someuser/tow-plugin-mssql
+
+# From GitHub repo with specific file path
+tow plugin add myorg/infra-plugins/oracle.yaml
+
+# From any URL
+tow plugin add https://example.com/my-custom-service.yaml
+
+# Remove
+tow plugin remove mssql
+
+# List all installed (bundled + external)
+tow plugin list
+```
+
+### Plugin Resolution Order
+
+1. **Built-in handlers** (Go code: java, springboot, node, python, etc.)
+2. **Bundled plugins** (embedded in binary: kafka, redis, mysql, etc.)
+3. **`./plugins/`** (project-level, committed to git)
+4. **`~/.tow/plugins/`** (global, installed via `tow plugin add`)
 
 ---
 
@@ -306,8 +329,20 @@ data_dirs: [data]
 log_file: "myservice.log"
 ```
 
-## Contributing
+## Publishing Your Own Plugin
+
+### Option A: GitHub Repository (recommended)
+
+1. Create a repo (e.g., `myuser/tow-plugin-oracle`)
+2. Add `oracle.yaml` following the schema above
+3. Users install with: `tow plugin add myuser/tow-plugin-oracle`
+
+Convention: name the repo `tow-plugin-{service}` — tow will automatically look for `{service}.yaml` in the repo root.
+
+### Option B: Submit to bundled collection
 
 1. Create a YAML file following the schema above
 2. Test: `tow validate && tow provision && tow deploy`
 3. Submit a PR to [neurosamAI/tow-cli](https://github.com/neurosamAI/tow-cli)
+
+Accepted plugins are bundled in the next release and available to all users without installation.
