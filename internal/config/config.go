@@ -92,6 +92,7 @@ type SSHConfig struct {
 // Module defines a deployable service/application
 type Module struct {
 	Type            string            `yaml:"type"`             // java, kafka, redis, node, python, generic
+	Version         string            `yaml:"version"`          // package version (e.g., "3.7.0") — required for plugin types
 	Port            int               `yaml:"port"`             // service port
 	SSH             *SSHConfig        `yaml:"ssh"`              // per-module SSH config (optional)
 	BuildCmd        string            `yaml:"build_cmd"`        // build command (e.g., "./gradlew :module:bootJar")
@@ -263,6 +264,22 @@ func (c *Config) applyDefaults() {
 		}
 		if mod.HealthCheck.Timeout == 0 {
 			mod.HealthCheck = c.Defaults.HealthCheck
+		}
+
+		// Set default version from plugin if not specified by user
+		if mod.Version == "" {
+			if pluginDef := module.GetPluginDef(mod.Type); pluginDef != nil {
+				mod.Version = pluginDef.Package.DefaultVersion
+				fmt.Fprintf(os.Stderr, "  [warn] module %q: no version specified, using plugin default %q. Pin with: version: \"%s\"\n",
+					name, mod.Version, mod.Version)
+			}
+		}
+
+		// If user specified a version, update the plugin's default for handler resolution
+		if mod.Version != "" {
+			if pluginDef := module.GetPluginDef(mod.Type); pluginDef != nil {
+				pluginDef.Package.DefaultVersion = mod.Version
+			}
 		}
 
 		// Apply handler defaults for empty commands/paths
@@ -492,6 +509,15 @@ func (c *Config) ValidateDetailed() []string {
 			issues = append(issues, fmt.Sprintf("module %q has no type", modName))
 		} else if !validModuleTypes[mod.Type] {
 			issues = append(issues, fmt.Sprintf("module %q has invalid type %q (valid: java, springboot, node, python, generic, kafka, redis)", modName, mod.Type))
+		}
+
+		// Warn if plugin-type module has no version pinned
+		if mod.Version == "" {
+			pluginDef := module.GetPluginDef(mod.Type)
+			if pluginDef != nil {
+				issues = append(issues, fmt.Sprintf("module %q: no version specified — using plugin default %q. Pin a version with 'version: \"%s\"' to avoid unexpected changes on plugin update",
+					modName, pluginDef.Package.DefaultVersion, pluginDef.Package.DefaultVersion))
+			}
 		}
 
 		// Check config directory exists if specified
