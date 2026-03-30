@@ -34,6 +34,51 @@ tow auto -e prod -m api-server        # Build → package → upload → deploy
 tow rollback -e prod -m api-server    # Instant rollback
 ```
 
+<details>
+<summary><b>See it in action — real production output</b></summary>
+
+```
+$ tow status -e prod -m api-server -o json
+[
+  {
+    "host": "3.34.xx.xxx",
+    "server": "api-1",
+    "status": "running",
+    "pid": "23117",
+    "uptime": "56-01:58:33",
+    "memory": "962468KB",
+    "deployment": "20240424-110212"
+  }
+]
+
+$ tow logs -e prod -m kafka --all -n 3
+[kafka-1] 2026-03-30 14:35:49 GC(7722152) Pause Young 765M→702M(1024M) 17ms
+[kafka-2] 2026-03-30 14:35:55 GC(8629812) Pause Young 340M→292M(1024M) 18ms
+[kafka-3] 2026-03-30 14:36:01 GC(7493779) Pause Young 797M→723M(1024M) 13ms
+
+$ tow ssh -e prod -m kafka --all -- "free -h | head -2"
+[kafka-1]              total        used        free
+[kafka-1] Mem:         1.9Gi       1.7Gi        66Mi
+[kafka-2]              total        used        free
+[kafka-2] Mem:         1.9Gi       1.7Gi        77Mi
+[kafka-3]              total        used        free
+[kafka-3] Mem:         1.9Gi       1.7Gi        70Mi
+
+$ tow doctor -e prod -m api-server
+  ✓ tow.yaml is valid
+  ✓ Environment 'prod' exists
+  ✓ SSH key exists
+  ✓ Servers configured (22)
+  ✓ SSH connection successful
+  ✓ Remote dir exists
+  ✓ Disk space — Available: 4.9G
+  ✓ Branch policy
+  ✓ No active deploy lock
+  9 passed, 0 failed
+```
+
+</details>
+
 ## Why Tow?
 
 | | Tow | Ansible | Capistrano | Kamal |
