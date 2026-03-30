@@ -21,6 +21,9 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// EmbeddedPluginData holds raw YAML content of bundled plugins (set by main package via SetEmbeddedPlugins)
+var embeddedPluginData map[string][]byte
+
 // PluginDef defines a module handler via YAML
 type PluginDef struct {
 	Name        string `yaml:"name"`        // e.g., "elasticsearch"
@@ -210,7 +213,7 @@ func GetPluginDef(typeName string) *PluginDef {
 	return nil
 }
 
-// PluginDir returns the default plugin directories to search
+// PluginDirs returns the default plugin directories to search
 func PluginDirs() []string {
 	dirs := []string{"plugins"}
 
@@ -220,4 +223,29 @@ func PluginDirs() []string {
 	}
 
 	return dirs
+}
+
+// SetEmbeddedPlugins registers bundled plugin YAML data (called from main)
+func SetEmbeddedPlugins(data map[string][]byte) {
+	embeddedPluginData = data
+}
+
+// LoadEmbeddedPlugins loads plugins from embedded data (bundled in binary)
+func LoadEmbeddedPlugins() {
+	if embeddedPluginData == nil {
+		return
+	}
+	for name, data := range embeddedPluginData {
+		var def PluginDef
+		if err := yaml.Unmarshal(data, &def); err != nil {
+			continue
+		}
+		if def.Name == "" {
+			def.Name = strings.TrimSuffix(name, ".yaml")
+		}
+		// Don't overwrite built-in or filesystem-loaded handlers
+		if _, exists := registry[def.Name]; !exists {
+			Register(&PluginHandler{Def: def})
+		}
+	}
 }

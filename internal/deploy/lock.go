@@ -84,9 +84,8 @@ func (d *Deployer) ForceUnlock(envName, moduleName string, serverNum int) error 
 		return err
 	}
 
-	baseDir := d.remoteBaseDir(moduleName)
-
 	for _, srv := range servers {
+		baseDir := d.RemoteBaseDirForServer(moduleName, srv)
 		ReleaseLock(d.ssh, env, srv.Host, baseDir)
 		logger.Success("[%s] Lock released for %s", srv.Host, moduleName)
 	}
@@ -101,10 +100,9 @@ func (d *Deployer) WithLock(envName, moduleName string, serverNum int, command s
 		return err
 	}
 
-	baseDir := d.remoteBaseDir(moduleName)
-
 	// Acquire lock on first server (coordinator)
 	srv := servers[0]
+	baseDir := d.RemoteBaseDirForServer(moduleName, srv)
 	if err := AcquireLock(d.ssh, env, srv.Host, baseDir, command); err != nil {
 		return err
 	}

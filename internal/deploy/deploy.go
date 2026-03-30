@@ -36,12 +36,12 @@ func deployTimestamp() string {
 
 // remoteBaseDir returns the base directory for a module on the remote server
 func (d *Deployer) remoteBaseDir(moduleName string) string {
-	return d.remoteBaseDirForServer(moduleName, config.Server{})
+	return d.RemoteBaseDirForServer(moduleName, config.Server{})
 }
 
-// remoteBaseDirForServer returns the base directory with server-aware path resolution.
+// RemoteBaseDirForServer returns the base directory with server-aware path resolution.
 // Supports deploy_path patterns: "{module}" (default) or "{module}-{server}" (legacy)
-func (d *Deployer) remoteBaseDirForServer(moduleName string, srv config.Server) string {
+func (d *Deployer) RemoteBaseDirForServer(moduleName string, srv config.Server) string {
 	baseDir := d.cfg.Project.BaseDir
 	if baseDir == "" {
 		baseDir = "/app"
@@ -76,7 +76,7 @@ func (d *Deployer) Init(envName, moduleName string, serverNum int) error {
 	mod := d.cfg.Modules[moduleName]
 
 	results := d.RunParallel(servers, env, func(srv config.Server) error {
-		baseDir := d.remoteBaseDirForServer(moduleName, srv)
+		baseDir := d.RemoteBaseDirForServer(moduleName, srv)
 		logger.ServerAction(srv.Host, "Initializing %s", moduleName)
 
 		dirs := []string{
@@ -128,7 +128,7 @@ func (d *Deployer) Upload(envName, moduleName string, serverNum int, filePath st
 	}
 
 	results := d.RunParallel(servers, env, func(srv config.Server) error {
-		baseDir := d.remoteBaseDirForServer(moduleName, srv)
+		baseDir := d.RemoteBaseDirForServer(moduleName, srv)
 		remotePath := filepath.Join(baseDir, "upload", filepath.Base(filePath))
 		logger.ServerAction(srv.Host, "Uploading %s → %s", filepath.Base(filePath), remotePath)
 
@@ -159,7 +159,7 @@ func (d *Deployer) Install(envName, moduleName string, serverNum int) error {
 	}
 
 	results := d.RunParallel(servers, env, func(srv config.Server) error {
-		baseDir := d.remoteBaseDirForServer(moduleName, srv)
+		baseDir := d.RemoteBaseDirForServer(moduleName, srv)
 		deployDir := filepath.Join(baseDir, "deploy", ts)
 		logger.ServerAction(srv.Host, "Installing %s (deploy/%s)", moduleName, ts)
 
@@ -233,7 +233,7 @@ func (d *Deployer) Start(envName, moduleName string, serverNum int) error {
 	mod := d.cfg.Modules[moduleName]
 
 	results := d.RunParallel(servers, env, func(srv config.Server) error {
-		baseDir := d.remoteBaseDirForServer(moduleName, srv)
+		baseDir := d.RemoteBaseDirForServer(moduleName, srv)
 
 		startCmd := mod.StartCmd
 		if startCmd == "" {
@@ -282,7 +282,7 @@ func (d *Deployer) StartRolling(envName, moduleName string, serverNum int) error
 	mod := d.cfg.Modules[moduleName]
 
 	for i, srv := range servers {
-		baseDir := d.remoteBaseDirForServer(moduleName, srv)
+		baseDir := d.RemoteBaseDirForServer(moduleName, srv)
 
 		startCmd := mod.StartCmd
 		if startCmd == "" {
@@ -329,7 +329,7 @@ func (d *Deployer) Stop(envName, moduleName string, serverNum int) error {
 	mod := d.cfg.Modules[moduleName]
 
 	results := d.RunParallel(servers, env, func(srv config.Server) error {
-		baseDir := d.remoteBaseDirForServer(moduleName, srv)
+		baseDir := d.RemoteBaseDirForServer(moduleName, srv)
 
 		stopCmd := mod.StopCmd
 		if stopCmd == "" {
@@ -392,7 +392,7 @@ func (d *Deployer) Status(envName, moduleName string, serverNum int) error {
 	mod := d.cfg.Modules[moduleName]
 
 	for _, srv := range servers {
-		baseDir := d.remoteBaseDirForServer(moduleName, srv)
+		baseDir := d.RemoteBaseDirForServer(moduleName, srv)
 		statusCmd := mod.StatusCmd
 		if statusCmd == "" {
 			// Try handler default first
@@ -463,7 +463,7 @@ func (d *Deployer) StatusJSON(envName, moduleName string, serverNum int) (string
 	var statuses []ServerStatus
 
 	for _, srv := range servers {
-		baseDir := d.remoteBaseDirForServer(moduleName, srv)
+		baseDir := d.RemoteBaseDirForServer(moduleName, srv)
 		ss := ServerStatus{Host: srv.Host, Server: srv.ID()}
 
 		if mod.Port > 0 {
@@ -530,7 +530,7 @@ func (d *Deployer) Rollback(envName, moduleName string, serverNum int, target st
 	}
 
 	for _, srv := range servers {
-		baseDir := d.remoteBaseDirForServer(moduleName, srv)
+		baseDir := d.RemoteBaseDirForServer(moduleName, srv)
 		logger.ServerAction(srv.Host, "Rolling back %s", moduleName)
 
 		var rollbackCmd string
@@ -580,8 +580,8 @@ echo "ROLLBACK_OK from $CURRENT to $PREVIOUS"
 	return d.Restart(envName, moduleName, serverNum)
 }
 
-// Logs streams log output from a module
-func (d *Deployer) Logs(envName, moduleName string, serverNum int, filter string, lines int) error {
+// Logs reads or streams log output from a module
+func (d *Deployer) Logs(envName, moduleName string, serverNum int, filter string, lines int, follow bool) error {
 	servers, env, err := d.cfg.GetServersForModule(envName, moduleName, serverNum)
 	if err != nil {
 		return err
@@ -589,7 +589,7 @@ func (d *Deployer) Logs(envName, moduleName string, serverNum int, filter string
 
 	mod := d.cfg.Modules[moduleName]
 	srv := servers[0]
-	baseDir := d.remoteBaseDirForServer(moduleName, srv)
+	baseDir := d.RemoteBaseDirForServer(moduleName, srv)
 
 	logPath := mod.LogPath
 	if logPath == "" {
@@ -604,15 +604,55 @@ func (d *Deployer) Logs(envName, moduleName string, serverNum int, filter string
 		logPath = filepath.Join(baseDir, logDir, logFile)
 	}
 
-	tailCmd := fmt.Sprintf("tail -n %d -f %s", lines, logPath)
-	if filter != "" {
-		tailCmd += fmt.Sprintf(" | grep --line-buffered '%s'", filter)
+	// Auto-detect latest rotated log file if the default doesn't exist
+	// Handles daily rotation pattern: std.log, std.2026-03-30.log
+	detectCmd := fmt.Sprintf(`
+if [ -f "%s" ]; then
+    echo "%s"
+else
+    LATEST=$(ls -1t %s/%s/std*.log %s/%s/*.log 2>/dev/null | head -1)
+    if [ -n "$LATEST" ]; then
+        echo "$LATEST"
+    else
+        echo "%s"
+    fi
+fi
+`, logPath, logPath,
+		baseDir, d.cfg.Defaults.LogDir, baseDir, d.cfg.Defaults.LogDir,
+		logPath)
+
+	result, err := d.ssh.Exec(env, srv.Host, detectCmd)
+	if err == nil && strings.TrimSpace(result.Stdout) != "" {
+		logPath = strings.TrimSpace(result.Stdout)
 	}
 
-	logger.Info("Streaming logs from %s@%s:%s", env.SSHUser, srv.Host, logPath)
-	logger.Info("Press Ctrl+C to stop\n")
+	if follow {
+		tailCmd := fmt.Sprintf("tail -n %d -f %s", lines, logPath)
+		if filter != "" {
+			tailCmd += fmt.Sprintf(" | grep --line-buffered '%s'", filter)
+		}
 
-	return d.ssh.ExecStream(env, srv.Host, tailCmd, os.Stdout, os.Stderr)
+		logger.Info("Streaming logs from %s@%s:%s", env.SSHUser, srv.Host, logPath)
+		logger.Info("Press Ctrl+C to stop\n")
+
+		return d.ssh.ExecStream(env, srv.Host, tailCmd, os.Stdout, os.Stderr)
+	}
+
+	// Non-follow mode: read last N lines and exit
+	tailCmd := fmt.Sprintf("tail -n %d %s", lines, logPath)
+	if filter != "" {
+		tailCmd += fmt.Sprintf(" | grep '%s'", filter)
+	}
+
+	logger.Info("Reading logs from %s@%s:%s", env.SSHUser, srv.Host, logPath)
+
+	readResult, err := d.ssh.Exec(env, srv.Host, tailCmd)
+	if err != nil {
+		return fmt.Errorf("[%s] failed to read logs: %w", srv.Host, err)
+	}
+
+	fmt.Print(readResult.Stdout)
+	return nil
 }
 
 // ListDeployments shows deployment history for a module
@@ -623,7 +663,7 @@ func (d *Deployer) ListDeployments(envName, moduleName string, serverNum int) er
 	}
 
 	srv := servers[0]
-	baseDir := d.remoteBaseDirForServer(moduleName, srv)
+	baseDir := d.RemoteBaseDirForServer(moduleName, srv)
 
 	listCmd := fmt.Sprintf(`
 CURRENT=$(readlink %s/current 2>/dev/null | xargs basename 2>/dev/null)
@@ -653,7 +693,7 @@ func (d *Deployer) ListDeploymentsJSON(envName, moduleName string, serverNum int
 	}
 
 	srv := servers[0]
-	baseDir := d.remoteBaseDirForServer(moduleName, srv)
+	baseDir := d.RemoteBaseDirForServer(moduleName, srv)
 
 	listCmd := fmt.Sprintf(`
 CURRENT=$(readlink %s/current 2>/dev/null | xargs basename 2>/dev/null)
@@ -707,7 +747,7 @@ func (d *Deployer) Cleanup(envName, moduleName string, serverNum int, keep int) 
 	}
 
 	results := d.RunParallel(servers, env, func(srv config.Server) error {
-		baseDir := d.remoteBaseDirForServer(moduleName, srv)
+		baseDir := d.RemoteBaseDirForServer(moduleName, srv)
 		logger.ServerAction(srv.Host, "Cleaning up old deployments for %s (keeping %d)", moduleName, keep)
 
 		cleanupCmd := fmt.Sprintf(`
@@ -861,7 +901,7 @@ func (d *Deployer) Download(envName, moduleName string, serverNum int, remotePat
 	}
 
 	srv := servers[0]
-	baseDir := d.remoteBaseDirForServer(moduleName, srv)
+	baseDir := d.RemoteBaseDirForServer(moduleName, srv)
 
 	// If remotePath is relative, resolve it against module base dir
 	if !filepath.IsAbs(remotePath) {
@@ -980,7 +1020,7 @@ echo "TOOLS_OK"
 
 // provisionModule handles module-type-specific server initialization
 func (d *Deployer) provisionModule(env *config.Environment, srv config.Server, moduleName string, mod *config.Module) {
-	baseDir := d.remoteBaseDirForServer(moduleName, srv)
+	baseDir := d.RemoteBaseDirForServer(moduleName, srv)
 
 	// Check if there's a plugin definition with provision steps
 	pluginDef := module.GetPluginDef(mod.Type)

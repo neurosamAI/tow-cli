@@ -10,12 +10,14 @@ import (
 
 	mcpserver "github.com/neurosamAI/tow-cli/integrations/mcp-server"
 	"github.com/neurosamAI/tow-cli/internal/config"
+
 	"github.com/neurosamAI/tow-cli/internal/deploy"
 	"github.com/neurosamAI/tow-cli/internal/initializer"
 	"github.com/neurosamAI/tow-cli/internal/logger"
 	"github.com/neurosamAI/tow-cli/internal/module"
 	"github.com/neurosamAI/tow-cli/internal/pipeline"
 	"github.com/neurosamAI/tow-cli/internal/ssh"
+	_ "github.com/neurosamAI/tow-cli/plugins" // auto-register bundled plugins
 
 	"github.com/spf13/cobra"
 )
@@ -73,6 +75,7 @@ Supported by neurosam.AI — https://neurosam.ai`,
 		newProvisionCmd(),
 		newThreadDumpCmd(),
 		newPluginCmd(),
+		newDoctorCmd(),
 		newMCPServerCmd(),
 	)
 
@@ -471,16 +474,43 @@ func newStatusCmd() *cobra.Command {
 			}
 			defer sshMgr.Close()
 
-			env, mod, server, err := resolveTargets(cmd, cfg)
-			if err != nil {
-				return err
+			envName, _ := cmd.Flags().GetString("environment")
+			modName, _ := cmd.Flags().GetString("module")
+			serverFlag, _ := cmd.Flags().GetString("server")
+
+			if envName == "" {
+				return fmt.Errorf("environment (-e) is required")
 			}
 
 			output, _ := cmd.Flags().GetString("output")
 			deployer := deploy.New(cfg, sshMgr)
 
+			// If no module specified, show status of ALL modules
+			if modName == "" {
+				logger.Header("Status: all modules in %s", envName)
+				for name := range cfg.Modules {
+					serverNum := 0
+					if serverFlag != "" {
+						fmt.Sscanf(serverFlag, "%d", &serverNum)
+					}
+					// Only show modules that have servers in this env
+					servers, _, err := cfg.GetServersForModule(envName, name, serverNum)
+					if err != nil || len(servers) == 0 {
+						continue
+					}
+					fmt.Printf("\n  [%s]\n", name)
+					deployer.Status(envName, name, serverNum)
+				}
+				return nil
+			}
+
+			serverNum := 0
+			if serverFlag != "" {
+				fmt.Sscanf(serverFlag, "%d", &serverNum)
+			}
+
 			if output == "json" {
-				jsonStr, err := deployer.StatusJSON(env, mod, server)
+				jsonStr, err := deployer.StatusJSON(envName, modName, serverNum)
 				if err != nil {
 					return err
 				}
@@ -488,7 +518,7 @@ func newStatusCmd() *cobra.Command {
 				return nil
 			}
 
-			return deployer.Status(env, mod, server)
+			return deployer.Status(envName, modName, serverNum)
 		},
 	}
 	cmd.Flags().StringP("output", "o", "", "output format (json)")
@@ -603,13 +633,15 @@ func newLogsCmd() *cobra.Command {
 
 			filter, _ := cmd.Flags().GetString("filter")
 			lines, _ := cmd.Flags().GetInt("lines")
+			follow, _ := cmd.Flags().GetBool("follow")
 
 			deployer := deploy.New(cfg, sshMgr)
-			return deployer.Logs(env, mod, server, filter, lines)
+			return deployer.Logs(env, mod, server, filter, lines, follow)
 		},
 	}
 	cmd.Flags().StringP("filter", "f", "", "grep filter for log output")
-	cmd.Flags().IntP("lines", "n", 100, "number of tail lines")
+	cmd.Flags().IntP("lines", "n", 20, "number of tail lines")
+	cmd.Flags().BoolP("follow", "F", false, "follow log output (stream mode, like tail -f)")
 	return cmd
 }
 
@@ -1092,4 +1124,182 @@ Examples:
 	cmd.AddCommand(installCmd)
 
 	return cmd
+}
+
+func newDoctorCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "doctor",
+		Short: "Diagnose common issues before deploying",
+		Long:  `Pre-flight diagnostics: checks config, SSH connectivity, remote directories, disk space, and build tools.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfgPath, _ := cmd.Flags().GetString("config")
+			verbose, _ := cmd.Flags().GetBool("verbose")
+			insecure, _ := cmd.Flags().GetBool("insecure")
+			if verbose {
+				logger.SetLevel(logger.DebugLevel)
+			}
+
+			envName, _ := cmd.Flags().GetString("environment")
+			modName, _ := cmd.Flags().GetString("module")
+
+			if envName == "" {
+				return fmt.Errorf("environment (-e) is required")
+			}
+
+			passed := 0
+			failed := 0
+
+			check := func(name string, fn func() error) {
+				if err := fn(); err != nil {
+					fmt.Printf("  \033[31m✗\033[0m %s — %v\n", name, err)
+					failed++
+				} else {
+					fmt.Printf("  \033[32m✓\033[0m %s\n", name)
+					passed++
+				}
+			}
+
+			// 1. Config valid
+			check("tow.yaml is valid", func() error {
+				_, err := config.Load(cfgPath)
+				return err
+			})
+
+			cfg, err := config.Load(cfgPath)
+			if err != nil {
+				return err
+			}
+
+			// 2. Environment exists
+			env, ok := cfg.Environments[envName]
+			check(fmt.Sprintf("Environment '%s' exists", envName), func() error {
+				if !ok {
+					return fmt.Errorf("not found in config")
+				}
+				return nil
+			})
+			if !ok {
+				fmt.Printf("\n%d passed, %d failed\n", passed, failed)
+				return nil
+			}
+
+			// 3. SSH key
+			check("SSH key exists", func() error {
+				keyPath := env.SSHKeyPath
+				if keyPath == "" {
+					return fmt.Errorf("ssh_key_path not set")
+				}
+				if keyPath[0] == '~' {
+					if home, err := os.UserHomeDir(); err == nil {
+						keyPath = filepath.Join(home, keyPath[1:])
+					}
+				}
+				if _, err := os.Stat(keyPath); os.IsNotExist(err) {
+					return fmt.Errorf("%s not found", keyPath)
+				}
+				return nil
+			})
+
+			// 4. Servers exist
+			check(fmt.Sprintf("Servers configured (%d)", len(env.Servers)), func() error {
+				if len(env.Servers) == 0 {
+					return fmt.Errorf("no servers in environment")
+				}
+				return nil
+			})
+
+			// Get target modules
+			modules := []string{}
+			if modName != "" {
+				modules = append(modules, modName)
+			} else {
+				for name := range cfg.Modules {
+					modules = append(modules, name)
+				}
+			}
+
+			// 5. SSH connectivity (test first server of first module)
+			sshMgr := ssh.NewManager(insecure)
+			defer sshMgr.Close()
+
+			if len(env.Servers) > 0 {
+				srv := env.Servers[0]
+				check(fmt.Sprintf("SSH connection to %s", srv.Host), func() error {
+					result, err := sshMgr.Exec(env, srv.Host, "echo OK")
+					if err != nil {
+						return err
+					}
+					if !strings.Contains(result.Stdout, "OK") {
+						return fmt.Errorf("unexpected response")
+					}
+					return nil
+				})
+
+				// 6. Remote directory + disk space
+				for _, modN := range modules {
+					servers, _, err := cfg.GetServersForModule(envName, modN, 0)
+					if err != nil || len(servers) == 0 {
+						continue
+					}
+					s := servers[0]
+					deployer := deploy.New(cfg, sshMgr)
+					baseDir := deployer.RemoteBaseDirForServer(modN, s)
+
+					check(fmt.Sprintf("Remote dir exists: %s (%s)", baseDir, s.Host), func() error {
+						result, err := sshMgr.Exec(env, s.Host, fmt.Sprintf("test -d %s && echo EXISTS || echo MISSING", baseDir))
+						if err != nil {
+							return err
+						}
+						if strings.Contains(result.Stdout, "MISSING") {
+							return fmt.Errorf("directory not found — run: tow setup")
+						}
+						return nil
+					})
+					break // only check first module's first server
+				}
+
+				check(fmt.Sprintf("Disk space on %s", srv.Host), func() error {
+					result, err := sshMgr.Exec(env, srv.Host, "df -h / | tail -1 | awk '{print $4}'")
+					if err != nil {
+						return err
+					}
+					fmt.Printf("    Available: %s\n", strings.TrimSpace(result.Stdout))
+					return nil
+				})
+			}
+
+			// 7. Branch check
+			if modName != "" {
+				check("Branch policy", func() error {
+					return deploy.CheckBranch(cfg, envName, "deploy")
+				})
+			}
+
+			// 8. No active lock
+			if modName != "" && len(env.Servers) > 0 {
+				servers, _, _ := cfg.GetServersForModule(envName, modName, 0)
+				if len(servers) > 0 {
+					srv := servers[0]
+					deployer := deploy.New(cfg, sshMgr)
+					baseDir := deployer.RemoteBaseDirForServer(modName, srv)
+					check("No active deploy lock", func() error {
+						result, err := sshMgr.Exec(env, srv.Host, fmt.Sprintf("test -d %s/.tow-lock && echo LOCKED || echo FREE", baseDir))
+						if err != nil {
+							return err
+						}
+						if strings.Contains(result.Stdout, "LOCKED") {
+							return fmt.Errorf("deploy lock active — run: tow unlock")
+						}
+						return nil
+					})
+				}
+			}
+
+			fmt.Printf("\n%d passed, %d failed\n", passed, failed)
+			if failed > 0 {
+				return fmt.Errorf("%d check(s) failed", failed)
+			}
+			return nil
+		},
+	}
 }
