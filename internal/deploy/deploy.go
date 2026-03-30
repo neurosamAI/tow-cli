@@ -1,12 +1,14 @@
 package deploy
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/neurosamAI/tow-cli/internal/config"
@@ -580,15 +582,23 @@ echo "ROLLBACK_OK from $CURRENT to $PREVIOUS"
 	return d.Restart(envName, moduleName, serverNum)
 }
 
-// Logs reads or streams log output from a module
-func (d *Deployer) Logs(envName, moduleName string, serverNum int, filter string, lines int, follow bool) error {
-	servers, env, err := d.cfg.GetServersForModule(envName, moduleName, serverNum)
-	if err != nil {
-		return err
-	}
+// serverLogColors assigns colors to server prefixes for multi-server log output
+var serverLogColors = []string{
+	"\033[36m", // cyan
+	"\033[33m", // yellow
+	"\033[32m", // green
+	"\033[35m", // magenta
+	"\033[34m", // blue
+	"\033[91m", // bright red
+	"\033[92m", // bright green
+	"\033[93m", // bright yellow
+	"\033[94m", // bright blue
+	"\033[95m", // bright magenta
+}
 
+// resolveLogPath returns the log file path for a server, auto-detecting rotated files
+func (d *Deployer) resolveLogPath(env *config.Environment, srv config.Server, moduleName string) string {
 	mod := d.cfg.Modules[moduleName]
-	srv := servers[0]
 	baseDir := d.RemoteBaseDirForServer(moduleName, srv)
 
 	logPath := mod.LogPath
@@ -604,55 +614,165 @@ func (d *Deployer) Logs(envName, moduleName string, serverNum int, filter string
 		logPath = filepath.Join(baseDir, logDir, logFile)
 	}
 
-	// Auto-detect latest rotated log file if the default doesn't exist
-	// Handles daily rotation pattern: std.log, std.2026-03-30.log
+	// Auto-detect latest rotated log file
 	detectCmd := fmt.Sprintf(`
-if [ -f "%s" ]; then
-    echo "%s"
-else
-    LATEST=$(ls -1t %s/%s/std*.log %s/%s/*.log 2>/dev/null | head -1)
-    if [ -n "$LATEST" ]; then
-        echo "$LATEST"
-    else
-        echo "%s"
-    fi
-fi
-`, logPath, logPath,
-		baseDir, d.cfg.Defaults.LogDir, baseDir, d.cfg.Defaults.LogDir,
-		logPath)
+if [ -f "%s" ]; then echo "%s"
+else LATEST=$(ls -1t %s/log/std*.log %s/log/*.log 2>/dev/null | head -1)
+  if [ -n "$LATEST" ]; then echo "$LATEST"; else echo "%s"; fi
+fi`, logPath, logPath, baseDir, baseDir, logPath)
 
 	result, err := d.ssh.Exec(env, srv.Host, detectCmd)
 	if err == nil && strings.TrimSpace(result.Stdout) != "" {
-		logPath = strings.TrimSpace(result.Stdout)
+		return strings.TrimSpace(result.Stdout)
 	}
+	return logPath
+}
+
+// Logs reads or streams log output from a module (single or multi-server)
+func (d *Deployer) Logs(envName, moduleName string, serverNum int, filter string, lines int, follow bool) error {
+	servers, env, err := d.cfg.GetServersForModule(envName, moduleName, serverNum)
+	if err != nil {
+		return err
+	}
+
+	// Single server — simple path
+	if len(servers) == 1 {
+		return d.logsSingle(env, servers[0], moduleName, filter, lines, follow)
+	}
+
+	// Multi-server — multiplexed output with color-coded prefixes
+	return d.logsMulti(env, servers, moduleName, filter, lines, follow)
+}
+
+// LogsForServers reads/streams logs from a pre-filtered list of servers
+func (d *Deployer) LogsForServers(envName, moduleName string, servers []config.Server, filter string, lines int, follow bool) error {
+	env, ok := d.cfg.Environments[envName]
+	if !ok {
+		return fmt.Errorf("environment %q not found", envName)
+	}
+
+	if len(servers) == 1 {
+		return d.logsSingle(env, servers[0], moduleName, filter, lines, follow)
+	}
+	return d.logsMulti(env, servers, moduleName, filter, lines, follow)
+}
+
+// logsSingle handles log reading/streaming for a single server
+func (d *Deployer) logsSingle(env *config.Environment, srv config.Server, moduleName, filter string, lines int, follow bool) error {
+	logPath := d.resolveLogPath(env, srv, moduleName)
 
 	if follow {
 		tailCmd := fmt.Sprintf("tail -n %d -f %s", lines, logPath)
 		if filter != "" {
 			tailCmd += fmt.Sprintf(" | grep --line-buffered '%s'", filter)
 		}
-
 		logger.Info("Streaming logs from %s@%s:%s", env.SSHUser, srv.Host, logPath)
 		logger.Info("Press Ctrl+C to stop\n")
-
 		return d.ssh.ExecStream(env, srv.Host, tailCmd, os.Stdout, os.Stderr)
 	}
 
-	// Non-follow mode: read last N lines and exit
 	tailCmd := fmt.Sprintf("tail -n %d %s", lines, logPath)
 	if filter != "" {
 		tailCmd += fmt.Sprintf(" | grep '%s'", filter)
 	}
-
 	logger.Info("Reading logs from %s@%s:%s", env.SSHUser, srv.Host, logPath)
-
-	readResult, err := d.ssh.Exec(env, srv.Host, tailCmd)
+	result, err := d.ssh.Exec(env, srv.Host, tailCmd)
 	if err != nil {
 		return fmt.Errorf("[%s] failed to read logs: %w", srv.Host, err)
 	}
-
-	fmt.Print(readResult.Stdout)
+	fmt.Print(result.Stdout)
 	return nil
+}
+
+// logsMulti handles multiplexed log output from multiple servers
+func (d *Deployer) logsMulti(env *config.Environment, servers []config.Server, moduleName, filter string, lines int, follow bool) error {
+	colorReset := "\033[0m"
+
+	if !follow {
+		// Non-follow: read from each server sequentially with prefix
+		for i, srv := range servers {
+			logPath := d.resolveLogPath(env, srv, moduleName)
+			color := serverLogColors[i%len(serverLogColors)]
+			prefix := fmt.Sprintf("%s[%s]%s ", color, srv.ID(), colorReset)
+
+			tailCmd := fmt.Sprintf("tail -n %d %s", lines, logPath)
+			if filter != "" {
+				tailCmd += fmt.Sprintf(" | grep '%s'", filter)
+			}
+
+			result, err := d.ssh.Exec(env, srv.Host, tailCmd)
+			if err != nil {
+				logger.Warn("[%s] failed to read logs: %v", srv.ID(), err)
+				continue
+			}
+
+			for _, line := range strings.Split(strings.TrimRight(result.Stdout, "\n"), "\n") {
+				if line != "" {
+					fmt.Printf("%s%s\n", prefix, line)
+				}
+			}
+		}
+		return nil
+	}
+
+	// Follow mode: concurrent SSH streams with color-coded prefix
+	logger.Info("Streaming logs from %d servers. Press Ctrl+C to stop.\n", len(servers))
+
+	var wg sync.WaitGroup
+	for i, srv := range servers {
+		wg.Add(1)
+		go func(idx int, s config.Server) {
+			defer wg.Done()
+
+			logPath := d.resolveLogPath(env, s, moduleName)
+			color := serverLogColors[idx%len(serverLogColors)]
+			prefix := fmt.Sprintf("%s[%s]%s ", color, s.ID(), colorReset)
+
+			tailCmd := fmt.Sprintf("tail -n %d -f %s", lines, logPath)
+			if filter != "" {
+				tailCmd += fmt.Sprintf(" | grep --line-buffered '%s'", filter)
+			}
+
+			// Create a prefixed writer that adds server name to each line
+			pw := &prefixWriter{prefix: prefix, out: os.Stdout}
+			if err := d.ssh.ExecStream(env, s.Host, tailCmd, pw, pw); err != nil {
+				logger.Warn("[%s] log stream ended: %v", s.ID(), err)
+			}
+		}(i, srv)
+	}
+
+	wg.Wait()
+	return nil
+}
+
+// prefixWriter wraps an io.Writer and prepends a prefix to each line
+type prefixWriter struct {
+	prefix string
+	out    *os.File
+	buf    []byte
+	mu     sync.Mutex
+}
+
+func (pw *prefixWriter) Write(p []byte) (n int, err error) {
+	pw.mu.Lock()
+	defer pw.mu.Unlock()
+
+	pw.buf = append(pw.buf, p...)
+
+	for {
+		idx := bytes.IndexByte(pw.buf, '\n')
+		if idx < 0 {
+			break
+		}
+		line := pw.buf[:idx]
+		pw.buf = pw.buf[idx+1:]
+
+		if len(line) > 0 {
+			fmt.Fprintf(pw.out, "%s%s\n", pw.prefix, string(line))
+		}
+	}
+
+	return len(p), nil
 }
 
 // ListDeployments shows deployment history for a module

@@ -622,31 +622,247 @@ func newRollbackCmd() *cobra.Command {
 func newLogsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "logs",
-		Short: "Stream logs from a module",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, sshMgr, err := loadContext(cmd)
-			if err != nil {
-				return err
-			}
-			defer sshMgr.Close()
+		Short: "Read or stream logs from one or multiple servers",
+		Long: `Read or stream log output from module servers.
 
-			env, mod, server, err := resolveTargets(cmd, cfg)
-			if err != nil {
-				return err
+Examples:
+  tow logs -e prod -m kafka -n 20              # last 20 lines from first server
+  tow logs -e prod -m kafka -s kafka-1 -F      # stream from specific server
+  tow logs -e prod -m kafka --all -F           # stream from ALL servers (multiplexed)
+  tow logs -e prod -m kafka -s kafka-1,kafka-3 # multiple specific servers
+  tow logs -e prod -m kafka -f ERROR           # filter for ERROR
+  tow logs --preset infra-logs -F              # use saved preset
+  tow logs --list-presets                       # show saved presets`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Handle preset listing
+			listPresets, _ := cmd.Flags().GetBool("list-presets")
+			if listPresets {
+				return showPresets()
+			}
+
+			deletePreset, _ := cmd.Flags().GetString("delete-preset")
+			if deletePreset != "" {
+				return removePreset(deletePreset)
 			}
 
 			filter, _ := cmd.Flags().GetString("filter")
 			lines, _ := cmd.Flags().GetInt("lines")
 			follow, _ := cmd.Flags().GetBool("follow")
 
+			// Handle preset loading
+			presetName, _ := cmd.Flags().GetString("preset")
+			if presetName != "" {
+				return runPreset(cmd, presetName, filter, lines, follow)
+			}
+
+			cfg, sshMgr, err := loadContext(cmd)
+			if err != nil {
+				return err
+			}
+			defer sshMgr.Close()
+
+			envName, _ := cmd.Flags().GetString("environment")
+			modName, _ := cmd.Flags().GetString("module")
+			serverFlag, _ := cmd.Flags().GetString("server")
+			allServers, _ := cmd.Flags().GetBool("all")
+
+			if envName == "" {
+				return fmt.Errorf("environment (-e) is required")
+			}
+			if modName == "" {
+				return fmt.Errorf("module (-m) is required")
+			}
+
 			deployer := deploy.New(cfg, sshMgr)
-			return deployer.Logs(env, mod, server, filter, lines, follow)
+
+			var logsErr error
+			if allServers {
+				logsErr = deployer.Logs(envName, modName, 0, filter, lines, follow)
+			} else if serverFlag != "" && strings.Contains(serverFlag, ",") {
+				serverNames := strings.Split(serverFlag, ",")
+				servers, _, err := cfg.GetServersForModule(envName, modName, 0)
+				if err != nil {
+					return err
+				}
+				var filtered []config.Server
+				for _, srv := range servers {
+					for _, name := range serverNames {
+						if srv.ID() == strings.TrimSpace(name) {
+							filtered = append(filtered, srv)
+						}
+					}
+				}
+				if len(filtered) == 0 {
+					return fmt.Errorf("no matching servers found for: %s", serverFlag)
+				}
+				logsErr = deployer.LogsForServers(envName, modName, filtered, filter, lines, follow)
+			} else {
+				serverNum := 0
+				if serverFlag != "" {
+					fmt.Sscanf(serverFlag, "%d", &serverNum)
+				}
+				logsErr = deployer.Logs(envName, modName, serverNum, filter, lines, follow)
+			}
+
+			// Save preset if requested
+			savePresetName, _ := cmd.Flags().GetString("save-preset")
+			if savePresetName != "" && logsErr == nil {
+				saveLogPreset(savePresetName, envName, modName, serverFlag, allServers, filter, lines)
+			}
+
+			return logsErr
 		},
 	}
 	cmd.Flags().StringP("filter", "f", "", "grep filter for log output")
 	cmd.Flags().IntP("lines", "n", 20, "number of tail lines")
-	cmd.Flags().BoolP("follow", "F", false, "follow log output (stream mode, like tail -f)")
+	cmd.Flags().BoolP("follow", "F", false, "follow log output (stream mode)")
+	cmd.Flags().BoolP("all", "A", false, "show logs from all servers")
+	cmd.Flags().String("preset", "", "use a saved log preset")
+	cmd.Flags().String("save-preset", "", "save current log config as a preset")
+	cmd.Flags().Bool("list-presets", false, "list saved presets")
+	cmd.Flags().String("delete-preset", "", "delete a saved preset")
 	return cmd
+}
+
+// --- Log Presets ---
+
+type logPreset struct {
+	Env     string `yaml:"env"`
+	Module  string `yaml:"module"`
+	Servers string `yaml:"servers"` // comma-separated or "all"
+	Filter  string `yaml:"filter,omitempty"`
+	Lines   int    `yaml:"lines"`
+}
+
+type presetFile struct {
+	Presets map[string]logPreset `yaml:"presets"`
+}
+
+func presetsPath() string {
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".tow", "presets.yaml")
+}
+
+func loadPresets() (presetFile, error) {
+	var pf presetFile
+	pf.Presets = make(map[string]logPreset)
+
+	data, err := os.ReadFile(presetsPath())
+	if err != nil {
+		return pf, nil // file doesn't exist = empty presets
+	}
+	yaml.Unmarshal(data, &pf)
+	if pf.Presets == nil {
+		pf.Presets = make(map[string]logPreset)
+	}
+	return pf, nil
+}
+
+func savePresets(pf presetFile) error {
+	dir := filepath.Dir(presetsPath())
+	os.MkdirAll(dir, 0755)
+	data, err := yaml.Marshal(pf)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(presetsPath(), data, 0644)
+}
+
+func saveLogPreset(name, env, mod, servers string, all bool, filter string, lines int) {
+	pf, _ := loadPresets()
+	s := servers
+	if all {
+		s = "all"
+	}
+	pf.Presets[name] = logPreset{Env: env, Module: mod, Servers: s, Filter: filter, Lines: lines}
+	if err := savePresets(pf); err != nil {
+		logger.Warn("Failed to save preset: %v", err)
+	} else {
+		logger.Success("Preset saved: %s", name)
+	}
+}
+
+func showPresets() error {
+	pf, _ := loadPresets()
+	if len(pf.Presets) == 0 {
+		fmt.Println("No presets saved. Create one with: tow logs ... --save-preset NAME")
+		return nil
+	}
+	for name, p := range pf.Presets {
+		fmt.Printf("  %-20s  env=%s module=%s servers=%s", name, p.Env, p.Module, p.Servers)
+		if p.Filter != "" {
+			fmt.Printf(" filter=%q", p.Filter)
+		}
+		fmt.Println()
+	}
+	return nil
+}
+
+func removePreset(name string) error {
+	pf, _ := loadPresets()
+	if _, ok := pf.Presets[name]; !ok {
+		return fmt.Errorf("preset %q not found", name)
+	}
+	delete(pf.Presets, name)
+	if err := savePresets(pf); err != nil {
+		return err
+	}
+	logger.Success("Preset deleted: %s", name)
+	return nil
+}
+
+func runPreset(cmd *cobra.Command, name, filterOverride string, linesOverride int, followOverride bool) error {
+	pf, _ := loadPresets()
+	p, ok := pf.Presets[name]
+	if !ok {
+		return fmt.Errorf("preset %q not found. Use --list-presets to see available", name)
+	}
+
+	cfg, sshMgr, err := loadContextFromPath(cmd)
+	if err != nil {
+		return err
+	}
+	defer sshMgr.Close()
+
+	filter := p.Filter
+	if filterOverride != "" {
+		filter = filterOverride
+	}
+	lines := p.Lines
+	if linesOverride > 0 {
+		lines = linesOverride
+	}
+
+	deployer := deploy.New(cfg, sshMgr)
+
+	if p.Servers == "all" {
+		return deployer.Logs(p.Env, p.Module, 0, filter, lines, followOverride)
+	}
+
+	if strings.Contains(p.Servers, ",") {
+		serverNames := strings.Split(p.Servers, ",")
+		servers, _, err := cfg.GetServersForModule(p.Env, p.Module, 0)
+		if err != nil {
+			return err
+		}
+		var filtered []config.Server
+		for _, srv := range servers {
+			for _, n := range serverNames {
+				if srv.ID() == strings.TrimSpace(n) {
+					filtered = append(filtered, srv)
+				}
+			}
+		}
+		return deployer.LogsForServers(p.Env, p.Module, filtered, filter, lines, followOverride)
+	}
+
+	serverNum := 0
+	fmt.Sscanf(p.Servers, "%d", &serverNum)
+	return deployer.Logs(p.Env, p.Module, serverNum, filter, lines, followOverride)
+}
+
+func loadContextFromPath(cmd *cobra.Command) (*config.Config, *ssh.Manager, error) {
+	return loadContext(cmd)
 }
 
 func newSetupCmd() *cobra.Command {
