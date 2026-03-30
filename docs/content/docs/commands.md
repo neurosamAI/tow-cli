@@ -137,13 +137,87 @@ Rollback is instant — it switches the `current` symlink and restarts the servi
 
 ### `tow logs`
 
-Stream remote log files.
+Stream remote log files from one or more servers.
 
 ```bash
 tow logs -e prod -m api-server
-tow logs -e prod -m api-server -f "ERROR"      # Filter with grep
-tow logs -e prod -m api-server -n 100           # Last 100 lines
-tow logs -e prod -m api-server -s 1             # Specific server
+tow logs -e prod -m api-server -f "ERROR"                 # Filter with grep
+tow logs -e prod -m api-server -n 100                     # Last 100 lines
+tow logs -e prod -m api-server -s kafka-1                 # Specific server
+tow logs -e prod -m api-server -s kafka-1,kafka-3         # Multiple servers (comma-separated)
+tow logs -e prod -m api-server --all                      # All servers simultaneously
+tow logs -e prod -m api-server -F                         # Follow (live tail)
+```
+
+#### Log Presets
+
+Save and reuse frequently used log queries:
+
+```bash
+tow logs -e prod -m api-server -f "ERROR" --save-preset error-logs
+tow logs --preset error-logs                              # Replay saved query
+tow logs --list-presets                                   # List all saved presets
+tow logs --delete-preset error-logs                       # Remove a preset
+```
+
+| Flag | Short | Description |
+|------|-------|-------------|
+| `--all` | | Stream logs from all servers simultaneously |
+| `-s` | | Target servers (comma-separated, e.g., `kafka-1,kafka-3`) |
+| `-F` | | Follow mode — live tail of log output |
+| `--preset` | | Replay a saved log query preset |
+| `--save-preset` | | Save the current query as a named preset |
+| `--list-presets` | | List all saved log presets |
+| `--delete-preset` | | Delete a saved log preset |
+
+### `tow ssh`
+
+Execute ad-hoc commands on remote servers over SSH without opening an interactive session.
+
+```bash
+tow ssh -e prod -m kafka --all -- "free -h"
+tow ssh -e prod -m api-server -s 1 -- "df -h"
+tow ssh -e prod -m kafka -s kafka-1,kafka-3 -- "cat /etc/os-release"
+```
+
+The command after `--` is executed on every matched server. Output is prefixed with the server name for clarity.
+
+### `tow diff`
+
+Compare deployed code on a remote server against the local build artifact or source.
+
+```bash
+tow diff -e prod -m api-server
+tow diff -e prod -m api-server -s 1
+```
+
+Shows a summary of files that differ between the currently deployed version and the local artifact. Useful for verifying what will change before running `tow deploy`.
+
+### `tow config`
+
+Manage servers, modules, and assignments in `tow.yaml` from the command line.
+
+#### Server management
+
+```bash
+tow config server add -e prod --name api-3 --host 10.0.1.30
+tow config server remove -e prod --name api-3
+tow config server list -e prod
+```
+
+#### Module management
+
+```bash
+tow config module add --name payment-api --type springboot --port 8083
+tow config module remove --name payment-api
+tow config module list
+```
+
+#### Assign / unassign modules to servers
+
+```bash
+tow config assign -e prod --server api-3 --module payment-api
+tow config unassign -e prod --server api-3 --module payment-api
 ```
 
 ### `tow setup`

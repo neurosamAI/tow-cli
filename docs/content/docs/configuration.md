@@ -39,6 +39,9 @@ defaults:
   ssh_port: 22                # Default SSH port (default: 22)
   ssh_key_path: ~/.ssh/id_rsa # Path to SSH private key
   deploy_dir: deploy          # Deploy directory name (default: deploy)
+  deploy_path: "{module}"     # Deploy path template (default: "{module}")
+  log_dir: log                # Log subdirectory name (default: log)
+  log_file: std.log           # Default log filename (default: std.log)
   health_check:
     type: tcp                  # tcp | http | log | command
     timeout: 300               # Total timeout in seconds (default: 300)
@@ -134,6 +137,25 @@ config/
 
 Resolution order: `config/{env}-{serverName}/` > `config/{env}/` > `config/`
 
+#### `defaults.deploy_path`
+
+Controls the remote directory name for each module instance.
+
+| Value | Resolves to | Example |
+|-------|-------------|---------|
+| `"{module}"` (default) | Module name only | `/app/api-server/` |
+| `"{module}-{server}"` | Module + server number (legacy) | `/app/api-server-1/` |
+
+If you are migrating from a system that used numbered directories, set `deploy_path: "{module}-{server}"` to preserve compatibility.
+
+#### `defaults.log_dir`
+
+Name of the log subdirectory inside each module directory. Defaults to `"log"`. For example, with the default value, logs are stored at `/app/api-server/log/`.
+
+#### `defaults.log_file`
+
+Default log filename within `log_dir`. Defaults to `"std.log"`. This is used by `tow logs` when no explicit `log_path` is set on the module.
+
 ### `modules`
 
 Define deployable services/applications.
@@ -142,6 +164,7 @@ Define deployable services/applications.
 modules:
   api-server:
     type: springboot                   # Module type (see below)
+    version: 3.2.1                     # Version pin (required for plugin modules)
     port: 8080                         # Application port
     build_cmd: ./gradlew :api-server:bootJar
     artifact_path: api-server/build/libs/*.jar
@@ -186,6 +209,27 @@ modules:
       auth: key                        # key | password | agent
       key_path: ~/.ssh/special-key.pem
 ```
+
+#### `modules.{name}.version`
+
+Version pinning for plugin modules (e.g., Kafka, Redis, PostgreSQL). When set, Tow downloads and installs that exact version. This is **required** for plugin modules to prevent accidental upgrades.
+
+```yaml
+modules:
+  kafka:
+    type: kafka
+    version: 3.6.1    # Required — pinned version
+    port: 9092
+```
+
+If `version` is omitted for a plugin module, Tow prints a warning:
+
+```
+⚠  WARNING: Module 'kafka' (type: kafka) has no version pin.
+   Set 'version' in tow.yaml to prevent accidental upgrades.
+```
+
+For built-in application types (springboot, node, python, etc.), `version` is optional and purely informational.
 
 ## Module Types
 

@@ -4,6 +4,31 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-03-30
+
+### Added
+
+**New Commands**
+- `tow ssh` — execute ad-hoc commands on remote servers without interactive sessions (`tow ssh -e prod -m kafka --all -- "free -h"`)
+- `tow diff` — compare deployed code on remote servers against local build artifacts before deploying
+- `tow config server add/remove/list` — manage servers in `tow.yaml` from the command line
+- `tow config module add/remove/list` — manage modules in `tow.yaml` from the command line
+- `tow config assign/unassign` — assign and unassign modules to servers from the command line
+
+**Enhanced `tow logs`**
+- `--all` flag — stream logs from all servers simultaneously
+- Comma-separated server targeting (`-s kafka-1,kafka-3`)
+- `-F` flag — follow mode for live tailing of log output
+- Log presets: `--save-preset`, `--preset`, `--list-presets`, `--delete-preset` — save, replay, and manage frequently used log queries
+
+**Configuration**
+- `defaults.deploy_path` — configurable deploy path template (`"{module}"` default or `"{module}-{server}"` for legacy layouts)
+- `defaults.log_dir` — configurable log subdirectory name (default: `"log"`)
+- `defaults.log_file` — configurable default log filename (default: `"std.log"`)
+- `modules.{name}.version` — version pinning for plugin modules with warning when omitted
+
+---
+
 ## [0.1.0] - 2026-03-26
 
 ### Added

@@ -498,6 +498,104 @@ Then ask Claude: *"Deploy api-server to staging"* or *"Check prod status and sho
 }
 ```
 
+## Multi-Server Log Viewing with Presets
+
+When debugging across a cluster, viewing logs from multiple servers at once saves time:
+
+```bash
+# View logs from all Kafka brokers simultaneously
+tow logs -e prod -m kafka --all
+
+# View logs from specific brokers only
+tow logs -e prod -m kafka -s kafka-1,kafka-3
+
+# Follow logs in real time with an error filter
+tow logs -e prod -m kafka --all -F -f "ERROR"
+
+# Save a frequently used log query as a preset
+tow logs -e prod -m api-server -f "OutOfMemoryError" --save-preset oom-check
+
+# Replay the saved preset later
+tow logs --preset oom-check
+
+# Manage presets
+tow logs --list-presets
+tow logs --delete-preset oom-check
+```
+
+## Running Ad-Hoc Commands with `tow ssh`
+
+Execute commands across servers without opening interactive sessions:
+
+```bash
+# Check memory on all Kafka brokers
+tow ssh -e prod -m kafka --all -- "free -h"
+
+# Check disk usage on API servers
+tow ssh -e prod -m api-server --all -- "df -h"
+
+# View Java version on a specific server
+tow ssh -e prod -m api-server -s 1 -- "java -version"
+
+# Restart a system service (requires appropriate permissions)
+tow ssh -e prod -m kafka -s kafka-2 -- "sudo systemctl restart kafka"
+
+# Run on selected servers
+tow ssh -e prod -m kafka -s kafka-1,kafka-3 -- "cat /etc/os-release"
+```
+
+## Managing Configuration with `tow config`
+
+Add and remove servers, modules, and assignments directly from the CLI:
+
+```bash
+# Add a new server to the prod environment
+tow config server add -e prod --name api-3 --host 10.0.1.30
+
+# List all servers in prod
+tow config server list -e prod
+
+# Add a new module
+tow config module add --name payment-api --type springboot --port 8083
+
+# Assign the new module to the new server
+tow config assign -e prod --server api-3 --module payment-api
+
+# Verify the assignment
+tow config server list -e prod
+
+# Remove the assignment and clean up
+tow config unassign -e prod --server api-3 --module payment-api
+tow config server remove -e prod --name api-3
+tow config module remove --name payment-api
+```
+
+## Comparing Deployed vs Local with `tow diff`
+
+Before deploying, verify exactly what will change on the remote server:
+
+```bash
+# Compare local build against what's currently deployed
+tow diff -e prod -m api-server
+
+# Check a specific server
+tow diff -e prod -m api-server -s 1
+```
+
+Example output:
+
+```
+Comparing api-server: local vs prod/api-1 (deployed 2026-03-28T10:15:00Z)
+
+  Modified:  lib/api-server-1.0.1.jar  (size: 42.1MB → 42.3MB)
+  Added:     conf/new-feature.properties
+  Unchanged: bin/server, conf/application.yml (2 files)
+
+Summary: 1 modified, 1 added, 2 unchanged
+```
+
+This helps you confirm that only expected changes will be deployed, catching surprises before they reach production.
+
 ## Debugging Production Issues
 
 ```bash

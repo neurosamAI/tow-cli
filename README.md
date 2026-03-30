@@ -203,6 +203,9 @@ Local Machine                    Remote Server
 | `tow status` | Check module status (PID, uptime, memory) |
 | `tow rollback` | Switch to previous deployment |
 | `tow logs` | Stream remote logs with optional grep filter |
+| `tow ssh` | Execute commands on remote servers |
+| `tow diff` | Compare deployed vs local code |
+| `tow config` | Manage servers, modules, and assignments |
 | `tow upload` | Upload a file to target servers |
 | `tow install` | Install uploaded package (extract + symlink) |
 | `tow login` | SSH into a server |
@@ -211,6 +214,7 @@ Local Machine                    Remote Server
 | `tow cleanup` | Remove old deployment directories |
 | `tow download` | Download files from remote servers |
 | `tow provision` | Provision a new server (timezone, JRE, tools) |
+| `tow doctor` | Pre-flight diagnostics |
 | `tow mcp-server` | Start MCP server for AI agent integration |
 
 **Advanced flags:**
@@ -294,7 +298,7 @@ See [`integrations/vscode/`](integrations/vscode/) — sidebar UI with environme
 
 ## Current Status
 
-Tow is at **v0.1.0** — it's functional and actively developed, but early-stage. Here's what to expect:
+Tow is at **v0.2.0** — it's functional and actively developed, but early-stage. Here's what to expect:
 
 **What works well:**
 - Project auto-detection and config generation (10 languages, 40+ frameworks, 35 infrastructure plugins)
