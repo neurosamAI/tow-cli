@@ -1,6 +1,6 @@
 {
-  "name": "tow-deploy",
-  "displayName": "Tow Deploy",
+  "name": "tow-cli",
+  "displayName": "Tow CLI",
   "description": "Deploy to bare-metal servers and VMs — without the complexity of Kubernetes",
   "version": "0.1.0",
   "publisher": "neurosamai",
