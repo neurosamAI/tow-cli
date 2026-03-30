@@ -298,7 +298,7 @@ See [`integrations/vscode/`](integrations/vscode/) — sidebar UI with environme
 
 ## Production-Tested
 
-Tow has been validated on **real production infrastructure** at [Balkari Inc.](https://balkari.com), managing:
+Tow has been validated on **real production infrastructure** at [Balkari Inc.](https://balkari.io), managing:
 
 - **22 servers** across Spring Boot microservices, Kafka clusters, Redis, MongoDB, Prometheus, Grafana, and more
 - **Multi-server operations**: status checks across 3-node Kafka cluster, multiplexed log viewing, parallel SSH execution
