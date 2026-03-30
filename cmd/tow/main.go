@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -79,6 +80,8 @@ Supported by neurosam.AI — https://neurosam.ai`,
 		newProvisionCmd(),
 		newThreadDumpCmd(),
 		newPluginCmd(),
+		newSSHCmd(),
+		newDiffCmd(),
 		newDoctorCmd(),
 		newMCPServerCmd(),
 	)
@@ -1194,6 +1197,208 @@ by neurosam.AI — https://neurosam.ai`,
 			return server.Run()
 		},
 	}
+	return cmd
+}
+
+func newDiffCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "diff",
+		Short: "Show what will be deployed (changes since last deployment)",
+		Long: `Compare local code against the currently deployed version.
+
+Shows git log and diff since the deployed commit, helping you review
+what will change before running tow deploy.
+
+Examples:
+  tow diff -e prod -m api-server
+  tow diff -e prod -m api-server --stat    # file-level summary only`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, sshMgr, err := loadContext(cmd)
+			if err != nil {
+				return err
+			}
+			defer sshMgr.Close()
+
+			envName, modName, serverNum, err := resolveTargets(cmd, cfg)
+			if err != nil {
+				return err
+			}
+
+			statOnly, _ := cmd.Flags().GetBool("stat")
+
+			servers, env, err := cfg.GetServersForModule(envName, modName, serverNum)
+			if err != nil {
+				return err
+			}
+
+			srv := servers[0]
+			deployer := deploy.New(cfg, sshMgr)
+			baseDir := deployer.RemoteBaseDirForServer(modName, srv)
+
+			// Get currently deployed version info
+			deployInfoCmd := fmt.Sprintf(`
+CURRENT=$(readlink %s/current 2>/dev/null | xargs basename 2>/dev/null)
+if [ -f "%s/current/.tow-deploy-info" ]; then
+    cat "%s/current/.tow-deploy-info"
+else
+    echo "deploy_ts=$CURRENT"
+    echo "commit=unknown"
+fi
+`, baseDir, baseDir, baseDir)
+
+			result, err := sshMgr.Exec(env, srv.Host, deployInfoCmd)
+			if err != nil {
+				return fmt.Errorf("failed to get deployment info: %w", err)
+			}
+
+			// Parse deployed commit
+			deployedCommit := ""
+			deployedTS := ""
+			for _, line := range strings.Split(result.Stdout, "\n") {
+				if strings.HasPrefix(line, "commit=") {
+					deployedCommit = strings.TrimPrefix(line, "commit=")
+				}
+				if strings.HasPrefix(line, "deploy_ts=") {
+					deployedTS = strings.TrimPrefix(line, "deploy_ts=")
+				}
+			}
+
+			fmt.Printf("Environment:  %s\n", envName)
+			fmt.Printf("Module:       %s\n", modName)
+			fmt.Printf("Server:       %s (%s)\n", srv.ID(), srv.Host)
+			fmt.Printf("Deployed:     %s\n", deployedTS)
+
+			if deployedCommit == "" || deployedCommit == "unknown" {
+				fmt.Printf("Deployed commit: unknown (deploy was done before tow tracking)\n\n")
+				fmt.Println("Showing recent local commits instead:")
+
+				gitLog := exec.Command("git", "log", "--oneline", "-10")
+				gitLog.Stdout = os.Stdout
+				gitLog.Stderr = os.Stderr
+				return gitLog.Run()
+			}
+
+			fmt.Printf("Deployed commit: %s\n\n", deployedCommit)
+
+			// Show changes since deployed commit
+			fmt.Println("Changes since last deploy:")
+			fmt.Println(strings.Repeat("─", 50))
+
+			if statOnly {
+				gitDiff := exec.Command("git", "diff", "--stat", deployedCommit+"..HEAD")
+				gitDiff.Stdout = os.Stdout
+				gitDiff.Stderr = os.Stderr
+				return gitDiff.Run()
+			}
+
+			gitLog := exec.Command("git", "log", "--oneline", deployedCommit+"..HEAD")
+			gitLog.Stdout = os.Stdout
+			gitLog.Stderr = os.Stderr
+			if err := gitLog.Run(); err != nil {
+				return err
+			}
+
+			fmt.Println()
+			gitDiff := exec.Command("git", "diff", "--stat", deployedCommit+"..HEAD")
+			gitDiff.Stdout = os.Stdout
+			gitDiff.Stderr = os.Stderr
+			return gitDiff.Run()
+		},
+	}
+	cmd.Flags().Bool("stat", false, "show file-level summary only")
+	return cmd
+}
+
+func newSSHCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "ssh [flags] -- <command>",
+		Short: "Execute a command on remote servers",
+		Long: `Run ad-hoc commands on module servers without interactive login.
+
+Examples:
+  tow ssh -e prod -m api-server -- "free -h"
+  tow ssh -e prod -m kafka --all -- "df -h"
+  tow ssh -e prod -m kafka -s kafka-1,kafka-2 -- "cat /etc/os-release"
+  tow ssh -e prod -m api-server -- "tail -5 /var/log/syslog"`,
+		DisableFlagParsing: false,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, sshMgr, err := loadContext(cmd)
+			if err != nil {
+				return err
+			}
+			defer sshMgr.Close()
+
+			envName, _ := cmd.Flags().GetString("environment")
+			modName, _ := cmd.Flags().GetString("module")
+			serverFlag, _ := cmd.Flags().GetString("server")
+			allServers, _ := cmd.Flags().GetBool("all")
+
+			if envName == "" || modName == "" {
+				return fmt.Errorf("environment (-e) and module (-m) are required")
+			}
+			if len(args) == 0 {
+				return fmt.Errorf("command is required after --")
+			}
+
+			remoteCmd := strings.Join(args, " ")
+
+			servers, env, err := cfg.GetServersForModule(envName, modName, 0)
+			if err != nil {
+				return err
+			}
+
+			// Filter servers
+			if !allServers && serverFlag != "" {
+				names := strings.Split(serverFlag, ",")
+				var filtered []config.Server
+				for _, srv := range servers {
+					for _, n := range names {
+						if srv.ID() == strings.TrimSpace(n) {
+							filtered = append(filtered, srv)
+						}
+					}
+				}
+				servers = filtered
+			} else if !allServers {
+				servers = servers[:1] // default: first server only
+			}
+
+			if len(servers) == 0 {
+				return fmt.Errorf("no matching servers")
+			}
+
+			// Execute on each server with prefix
+			colorReset := "\033[0m"
+			colors := []string{"\033[36m", "\033[33m", "\033[32m", "\033[35m", "\033[34m"}
+
+			for i, srv := range servers {
+				result, err := sshMgr.Exec(env, srv.Host, remoteCmd)
+				if err != nil {
+					logger.Error("[%s] %v", srv.ID(), err)
+					continue
+				}
+
+				if len(servers) > 1 {
+					color := colors[i%len(colors)]
+					prefix := fmt.Sprintf("%s[%s]%s ", color, srv.ID(), colorReset)
+					for _, line := range strings.Split(strings.TrimRight(result.Stdout, "\n"), "\n") {
+						if line != "" {
+							fmt.Printf("%s%s\n", prefix, line)
+						}
+					}
+				} else {
+					fmt.Print(result.Stdout)
+				}
+
+				if result.Stderr != "" {
+					fmt.Fprint(os.Stderr, result.Stderr)
+				}
+			}
+
+			return nil
+		},
+	}
+	cmd.Flags().BoolP("all", "A", false, "execute on all servers")
 	return cmd
 }
 

@@ -192,6 +192,18 @@ echo "DEPLOY_OK"
 			return fmt.Errorf("install failed: %s%s", result.Stdout, result.Stderr)
 		}
 
+		// Write deployment metadata (git commit, branch, timestamp)
+		gitCommit, gitBranch, gitMsg := getGitInfo()
+		deployInfoCmd := fmt.Sprintf(`cat > %s/current/.tow-deploy-info << 'TOWEOF'
+deploy_ts=%s
+commit=%s
+branch=%s
+message=%s
+user=%s
+TOWEOF
+`, baseDir, ts, gitCommit, gitBranch, gitMsg, os.Getenv("USER"))
+		d.ssh.Exec(env, srv.Host, deployInfoCmd)
+
 		configPath := d.cfg.GetConfigPathByName(moduleName, envName, srv.Name, srv.Number)
 		if configPath != "" {
 			if info, err := os.Stat(configPath); err == nil && info.IsDir() {
@@ -1340,6 +1352,20 @@ func (d *Deployer) execHook(env *config.Environment, host, name, command string)
 }
 
 // runShell runs a shell command locally (for notifications)
+// getGitInfo returns current commit hash, branch, and last commit message
+func getGitInfo() (commit, branch, message string) {
+	if out, err := exec.Command("git", "rev-parse", "--short", "HEAD").Output(); err == nil {
+		commit = strings.TrimSpace(string(out))
+	}
+	if out, err := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD").Output(); err == nil {
+		branch = strings.TrimSpace(string(out))
+	}
+	if out, err := exec.Command("git", "log", "-1", "--format=%s").Output(); err == nil {
+		message = strings.TrimSpace(string(out))
+	}
+	return
+}
+
 func runShell(command string) error {
 	return exec.Command("sh", "-c", command).Run()
 }
