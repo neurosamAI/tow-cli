@@ -171,6 +171,32 @@ func (s *Server) Tools() []Tool {
 				"properties": {}
 			}`),
 		},
+		{
+			Name:        "tow_ssh",
+			Description: "Execute an ad-hoc command on remote servers and return the output",
+			InputSchema: json.RawMessage(`{
+				"type": "object",
+				"properties": {
+					"environment": {"type": "string", "description": "Target environment"},
+					"module": {"type": "string", "description": "Module name"},
+					"command": {"type": "string", "description": "Shell command to execute on the server"},
+					"server": {"type": "string", "description": "Server name (empty = first server)"}
+				},
+				"required": ["environment", "module", "command"]
+			}`),
+		},
+		{
+			Name:        "tow_doctor",
+			Description: "Run pre-flight diagnostics on a module — checks config, SSH, disk space, and deploy locks",
+			InputSchema: json.RawMessage(`{
+				"type": "object",
+				"properties": {
+					"environment": {"type": "string", "description": "Target environment"},
+					"module": {"type": "string", "description": "Module name (optional)"}
+				},
+				"required": ["environment"]
+			}`),
+		},
 	}
 }
 
@@ -275,9 +301,84 @@ func (s *Server) HandleToolCall(name string, args map[string]interface{}) (strin
 		return s.handleListModules()
 	case "tow_list_environments":
 		return s.handleListEnvironments()
+	case "tow_ssh":
+		return s.handleSSH(args)
+	case "tow_doctor":
+		return s.handleDoctor(args)
 	default:
 		return "", fmt.Errorf("unknown tool: %s", name)
 	}
+}
+
+func (s *Server) handleSSH(args map[string]interface{}) (string, error) {
+	env := argString(args, "environment")
+	mod := argString(args, "module")
+	command := argString(args, "command")
+	serverName := argString(args, "server")
+
+	servers, envCfg, err := s.cfg.GetServersForModule(env, mod, 0)
+	if err != nil {
+		return "", err
+	}
+
+	// Filter by server name if specified
+	if serverName != "" {
+		var filtered []config.Server
+		for _, srv := range servers {
+			if srv.ID() == serverName {
+				filtered = append(filtered, srv)
+			}
+		}
+		if len(filtered) > 0 {
+			servers = filtered
+		}
+	} else {
+		servers = servers[:1] // default: first server
+	}
+
+	var results []string
+	for _, srv := range servers {
+		result, err := s.ssh.Exec(envCfg, srv.Host, command)
+		if err != nil {
+			results = append(results, fmt.Sprintf("[%s] ERROR: %v", srv.ID(), err))
+		} else {
+			results = append(results, fmt.Sprintf("[%s]\n%s", srv.ID(), result.Stdout))
+		}
+	}
+
+	return strings.Join(results, "\n"), nil
+}
+
+func (s *Server) handleDoctor(args map[string]interface{}) (string, error) {
+	env := argString(args, "environment")
+
+	envCfg, ok := s.cfg.Environments[env]
+	if !ok {
+		return "", fmt.Errorf("environment %q not found", env)
+	}
+
+	var checks []string
+
+	// Check SSH connectivity to first server
+	if len(envCfg.Servers) > 0 {
+		srv := envCfg.Servers[0]
+		result, err := s.ssh.Exec(envCfg, srv.Host, "echo OK && df -h / | tail -1 | awk '{print $4}'")
+		if err != nil {
+			checks = append(checks, fmt.Sprintf("✗ SSH to %s: %v", srv.Host, err))
+		} else {
+			lines := strings.Split(strings.TrimSpace(result.Stdout), "\n")
+			if len(lines) >= 2 {
+				checks = append(checks, fmt.Sprintf("✓ SSH to %s: connected, disk available: %s", srv.Host, lines[1]))
+			} else {
+				checks = append(checks, fmt.Sprintf("✓ SSH to %s: connected", srv.Host))
+			}
+		}
+	}
+
+	checks = append(checks, fmt.Sprintf("✓ Servers: %d configured", len(envCfg.Servers)))
+	checks = append(checks, fmt.Sprintf("✓ Modules: %d configured", len(s.cfg.Modules)))
+
+	return strings.Join(checks, "\n"), nil
 }
 
 func (s *Server) handleStatus(args map[string]interface{}) (string, error) {

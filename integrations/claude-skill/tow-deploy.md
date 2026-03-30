@@ -1,86 +1,94 @@
-# Tow Deploy — Claude Code Agent Skill
-# by neurosam.AI — https://neurosam.ai
-#
-# Place this file in your project's .claude/skills/ directory
-# or reference it in CLAUDE.md to enable deployment via Claude Code.
-
 You have access to the `tow` CLI for deploying applications to remote servers.
 
 ## Available Commands
 
-### Check Status
+### Deployment
 ```bash
-tow status -e <environment> -m <module>
-tow status -e prod -m api-server -o json  # machine-readable
+tow status -e <env> -m <module>                    # Check status
+tow status -e <env>                                 # All modules status
+tow auto -e <env> -m <module> -y                    # Full deploy pipeline
+tow auto -e <env> -m <module> --rolling -y          # Rolling deploy
+tow auto -e <env> -m <module> --auto-rollback -y    # Deploy with auto-rollback
+tow deploy -e <env> -m <module> -y                  # Package + deploy only
+tow build -e <env> -m <module>                      # Build only
+tow package -e <env> -m <module>                    # Package only
+tow rollback -e <env> -m <module> -y                # Rollback
+tow start -e <env> -m <module>                      # Start
+tow stop -e <env> -m <module>                       # Stop
+tow restart -e <env> -m <module>                    # Restart
 ```
 
-### Deploy
+### Monitoring & Diagnostics
 ```bash
-# Full pipeline: build → package → upload → install → restart
-tow auto -e <environment> -m <module> -y
-
-# With rolling deployment (one server at a time)
-tow auto -e <environment> -m <module> --rolling -y
-
-# With auto-rollback on failure
-tow auto -e <environment> -m <module> --auto-rollback -y
+tow logs -e <env> -m <module> -n 50                 # Last 50 lines
+tow logs -e <env> -m <module> -f "ERROR"            # Filter errors
+tow logs -e <env> -m <module> --all -F              # Stream all servers
+tow logs -e <env> -m <module> -s srv-1,srv-2        # Multiple servers
+tow ssh -e <env> -m <module> --all -- "free -h"     # Run command on servers
+tow ssh -e <env> -m <module> -- "df -h"             # Disk space
+tow doctor -e <env> -m <module>                     # Pre-flight diagnostics
+tow diff -e <env> -m <module>                       # What will be deployed
 ```
 
-### Rollback
+### History & Information
 ```bash
-tow rollback -e <environment> -m <module> -y
-tow rollback -e <environment> -m <module> -t <timestamp> -y  # specific version
+tow list deployments -e <env> -m <module>           # Deployment history
+tow list deployments -e <env> -m <module> -o json   # JSON format
+tow status -e <env> -m <module> -o json             # Status as JSON
+tow list modules                                     # All modules
+tow list envs                                        # All environments
 ```
 
-### Monitor
+### Configuration Management
 ```bash
-tow logs -e <environment> -m <module> -n 50           # last 50 lines
-tow logs -e <environment> -m <module> -f "ERROR" -n 100  # filter errors
-tow list deployments -e <environment> -m <module> -o json
+tow config server list -e <env>                     # List servers
+tow config server add -e <env> --name srv --host IP --modules mod1,mod2
+tow config server remove -e <env> --name srv
+tow config module add my-api --type springboot --port 8080
+tow config module remove my-api
+tow config assign -e <env> --server srv --modules mod1,mod2
+tow config unassign -e <env> --server srv --modules mod1
 ```
 
-### Manage
+### Maintenance
 ```bash
-tow start -e <environment> -m <module>
-tow stop -e <environment> -m <module>
-tow restart -e <environment> -m <module>
-tow cleanup -e <environment> -m <module> --keep 3
+tow cleanup -e <env> -m <module> --keep 3           # Clean old deploys
+tow threaddump -e <env> -m <module>                 # Java thread dump
+tow provision -e <env> -m <module> --jre --tools    # Server setup
+tow plugin list                                      # Available plugins
 ```
 
 ## Safety Rules
 
-1. **ALWAYS check status before deploying**: `tow status -e <env> -m <module>`
-2. **ALWAYS use `-y` flag** when running non-interactively
-3. **For production**: Confirm with the user before running any deploy/rollback
-4. **After deploy**: Verify with `tow status` and check logs for errors
-5. **If deploy fails**: Check logs first, then consider `tow rollback`
+1. ALWAYS check status before deploying: `tow status -e <env> -m <module>`
+2. ALWAYS use `-y` flag when running non-interactively
+3. For production: confirm with the user before running any deploy/rollback
+4. After deploy: verify with `tow status` and check logs for errors
+5. If deploy fails: check logs first, then consider `tow rollback`
 
 ## Common Workflows
 
 ### Safe Production Deploy
 ```bash
-# 1. Check current status
-tow status -e prod -m api-server
-
-# 2. Deploy with auto-rollback safety net
-tow auto -e prod -m api-server --auto-rollback -y
-
-# 3. Verify
-tow status -e prod -m api-server
-tow logs -e prod -m api-server -f "ERROR" -n 20
+tow doctor -e prod -m api-server                    # Pre-flight check
+tow diff -e prod -m api-server                      # Review changes
+tow auto -e prod -m api-server --auto-rollback -y   # Deploy with safety net
+tow status -e prod -m api-server                    # Verify
+tow logs -e prod -m api-server -f "ERROR" -n 20     # Check for errors
 ```
 
 ### Investigate Production Issue
 ```bash
-# 1. Check status
-tow status -e prod -m api-server -o json
+tow status -e prod -m api-server -o json            # Quick status
+tow logs -e prod -m api-server -f "ERROR" -n 100    # Recent errors
+tow ssh -e prod -m api-server -- "free -h"          # Memory check
+tow ssh -e prod -m api-server -- "df -h"            # Disk check
+tow rollback -e prod -m api-server -y               # Rollback if needed
+```
 
-# 2. Check recent logs
-tow logs -e prod -m api-server -f "ERROR" -n 100
-
-# 3. If needed, rollback
-tow rollback -e prod -m api-server -y
-
-# 4. Verify recovery
-tow status -e prod -m api-server
+### Multi-Server Monitoring
+```bash
+tow logs -e prod -m kafka --all -n 10               # All Kafka servers
+tow ssh -e prod -m kafka --all -- "df -h"           # Disk on all nodes
+tow status -e prod                                   # All modules overview
 ```
