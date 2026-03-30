@@ -136,6 +136,9 @@ type Defaults struct {
 	SSHPort     int               `yaml:"ssh_port"`
 	SSHKeyPath  string            `yaml:"ssh_key_path"`
 	DeployDir   string            `yaml:"deploy_dir"`
+	DeployPath  string            `yaml:"deploy_path"` // remote dir pattern: "{module}" (default) or "{module}-{server}" (legacy)
+	LogDir      string            `yaml:"log_dir"`     // log subdirectory name: "log" (legacy) or "logs" (default)
+	LogFile     string            `yaml:"log_file"`    // default log filename: "std.log" (legacy) or "{module}.log"
 	HealthCheck HealthCheckConfig `yaml:"health_check"`
 }
 
@@ -151,8 +154,15 @@ func Load(path string) (*Config, error) {
 		return nil, fmt.Errorf("reading config file %s: %w", absPath, err)
 	}
 
-	// Expand environment variables (e.g., ${PROD_SERVER_IP}) in the raw YAML
-	expanded := os.ExpandEnv(string(data))
+	// Expand only SET environment variables; leave unset ${VAR} as-is
+	// This prevents build_cmd's ${ENV}, ${MODULE} from being wiped by os.ExpandEnv
+	rawStr := string(data)
+	expanded := os.Expand(rawStr, func(key string) string {
+		if val, ok := os.LookupEnv(key); ok {
+			return val
+		}
+		return "${" + key + "}" // leave unset vars as literal
+	})
 
 	cfg := &Config{}
 	if err := yaml.Unmarshal([]byte(expanded), cfg); err != nil {
@@ -505,4 +515,28 @@ func (c *Config) Summary() (envCount, moduleCount, serverCount int) {
 		serverCount += len(env.Servers)
 	}
 	return
+}
+
+// findUnsetEnvVars scans text for ${VAR} patterns and returns names of unset variables
+func findUnsetEnvVars(text string) []string {
+	var unset []string
+	seen := map[string]bool{}
+
+	for i := 0; i < len(text)-1; i++ {
+		if text[i] == '$' && text[i+1] == '{' {
+			end := strings.Index(text[i:], "}")
+			if end < 0 {
+				continue
+			}
+			varName := text[i+2 : i+end]
+			if varName == "" || seen[varName] {
+				continue
+			}
+			seen[varName] = true
+			if os.Getenv(varName) == "" {
+				unset = append(unset, varName)
+			}
+		}
+	}
+	return unset
 }

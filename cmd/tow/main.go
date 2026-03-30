@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	mcpserver "github.com/neurosamAI/tow-cli/integrations/mcp-server"
@@ -12,6 +13,7 @@ import (
 	"github.com/neurosamAI/tow-cli/internal/deploy"
 	"github.com/neurosamAI/tow-cli/internal/initializer"
 	"github.com/neurosamAI/tow-cli/internal/logger"
+	"github.com/neurosamAI/tow-cli/internal/module"
 	"github.com/neurosamAI/tow-cli/internal/pipeline"
 	"github.com/neurosamAI/tow-cli/internal/ssh"
 
@@ -70,6 +72,7 @@ Supported by neurosam.AI — https://neurosam.ai`,
 		newDownloadCmd(),
 		newProvisionCmd(),
 		newThreadDumpCmd(),
+		newPluginCmd(),
 		newMCPServerCmd(),
 	)
 
@@ -141,10 +144,14 @@ func resolveTargets(cmd *cobra.Command, cfg *config.Config) (string, string, int
 	return env, mod, serverNum, nil
 }
 
-
-
 // confirmProdDeploy asks for user confirmation when deploying to production-like environments
-func confirmProdDeploy(envName, moduleName, command string) bool {
+func confirmProdDeploy(cmd *cobra.Command, envName, moduleName, command string) bool {
+	// Skip confirmation in dry-run mode
+	dryRun, _ := cmd.Flags().GetBool("dry-run")
+	if dryRun {
+		return true
+	}
+
 	prodEnvs := map[string]bool{"prod": true, "production": true, "live": true}
 	if !prodEnvs[strings.ToLower(envName)] {
 		return true
@@ -268,12 +275,11 @@ func newBuildCmd() *cobra.Command {
 			}
 			defer sshMgr.Close()
 
-			_, mod, _, err := resolveTargets(cmd, cfg)
+			env, mod, _, err := resolveTargets(cmd, cfg)
 			if err != nil {
 				return err
 			}
 
-			env, _ := cmd.Flags().GetString("environment")
 			p := pipeline.New(cfg, sshMgr)
 			return p.Build(mod, env)
 		},
@@ -292,12 +298,11 @@ func newPackageCmd() *cobra.Command {
 			}
 			defer sshMgr.Close()
 
-			_, mod, _, err := resolveTargets(cmd, cfg)
+			env, mod, _, err := resolveTargets(cmd, cfg)
 			if err != nil {
 				return err
 			}
 
-			env, _ := cmd.Flags().GetString("environment")
 			p := pipeline.New(cfg, sshMgr)
 			return p.Package(mod, env)
 		},
@@ -321,7 +326,7 @@ func newDeployCmd() *cobra.Command {
 			}
 
 			yes, _ := cmd.Flags().GetBool("yes")
-			if !yes && !confirmProdDeploy(env, mod, "deploy") {
+			if !yes && !confirmProdDeploy(cmd, env, mod, "deploy") {
 				return fmt.Errorf("deployment cancelled")
 			}
 
@@ -358,7 +363,7 @@ func newAutoCmd() *cobra.Command {
 			}
 
 			yes, _ := cmd.Flags().GetBool("yes")
-			if !yes && !confirmProdDeploy(env, mod, "auto deploy") {
+			if !yes && !confirmProdDeploy(cmd, env, mod, "auto deploy") {
 				return fmt.Errorf("deployment cancelled")
 			}
 
@@ -507,7 +512,7 @@ func newRollbackCmd() *cobra.Command {
 			}
 
 			yes, _ := cmd.Flags().GetBool("yes")
-			if !yes && !confirmProdDeploy(env, mod, "rollback") {
+			if !yes && !confirmProdDeploy(cmd, env, mod, "rollback") {
 				return fmt.Errorf("rollback cancelled")
 			}
 
@@ -960,4 +965,131 @@ func newThreadDumpCmd() *cobra.Command {
 			return deployer.ThreadDump(env, mod, server)
 		},
 	}
+}
+
+func newPluginCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "plugin",
+		Short: "Manage infrastructure plugins",
+	}
+
+	cmd.AddCommand(&cobra.Command{
+		Use:   "list",
+		Short: "List installed plugins",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Load plugins from all directories
+			for _, dir := range module.PluginDirs() {
+				module.LoadPlugins(dir)
+			}
+
+			for _, name := range module.Available() {
+				def := module.GetPluginDef(name)
+				if def != nil {
+					ver := def.Package.DefaultVersion
+					if ver == "" {
+						ver = "-"
+					}
+					fmt.Printf("  %-25s  %s  (v%s)\n", name, def.Description, ver)
+				}
+			}
+			return nil
+		},
+	})
+
+	installCmd := &cobra.Command{
+		Use:   "install [plugins...]",
+		Short: "Install plugins to ~/.tow/plugins/ from bundled collection",
+		Long: `Install infrastructure plugins globally. Plugins are YAML files that define
+how to deploy services like Kafka, Redis, MySQL, etc.
+
+Examples:
+  tow plugin install kafka redis mongodb
+  tow plugin install --all`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			all, _ := cmd.Flags().GetBool("all")
+
+			// Find bundled plugins (from tow-cli source or executable dir)
+			srcDirs := []string{"plugins"}
+			// Also check executable's directory
+			if exe, err := os.Executable(); err == nil {
+				srcDirs = append(srcDirs, filepath.Join(filepath.Dir(exe), "plugins"))
+			}
+
+			var srcDir string
+			for _, d := range srcDirs {
+				if info, err := os.Stat(d); err == nil && info.IsDir() {
+					srcDir = d
+					break
+				}
+			}
+
+			if srcDir == "" {
+				return fmt.Errorf("bundled plugins directory not found. Download plugins from https://github.com/neurosamAI/tow-cli/tree/main/plugins")
+			}
+
+			destDir := filepath.Join(os.Getenv("HOME"), ".tow", "plugins")
+			if err := os.MkdirAll(destDir, 0755); err != nil {
+				return fmt.Errorf("creating plugin directory: %w", err)
+			}
+
+			entries, err := os.ReadDir(srcDir)
+			if err != nil {
+				return err
+			}
+
+			installed := 0
+			for _, entry := range entries {
+				name := strings.TrimSuffix(entry.Name(), ".yaml")
+				name = strings.TrimSuffix(name, ".yml")
+
+				if !all && len(args) > 0 {
+					found := false
+					for _, a := range args {
+						if a == name {
+							found = true
+							break
+						}
+					}
+					if !found {
+						continue
+					}
+				}
+
+				if entry.IsDir() || (!strings.HasSuffix(entry.Name(), ".yaml") && !strings.HasSuffix(entry.Name(), ".yml")) {
+					continue
+				}
+
+				src := filepath.Join(srcDir, entry.Name())
+				dst := filepath.Join(destDir, entry.Name())
+
+				data, err := os.ReadFile(src)
+				if err != nil {
+					logger.Warn("Failed to read %s: %v", src, err)
+					continue
+				}
+				if err := os.WriteFile(dst, data, 0644); err != nil {
+					logger.Warn("Failed to write %s: %v", dst, err)
+					continue
+				}
+				fmt.Printf("  Installed: %s → %s\n", name, dst)
+				installed++
+			}
+
+			if installed == 0 && !all {
+				fmt.Println("No matching plugins found. Available:")
+				for _, entry := range entries {
+					if strings.HasSuffix(entry.Name(), ".yaml") {
+						fmt.Printf("  %s\n", strings.TrimSuffix(entry.Name(), ".yaml"))
+					}
+				}
+			} else {
+				fmt.Printf("\n%d plugin(s) installed to %s\n", installed, destDir)
+			}
+			return nil
+		},
+	}
+	installCmd.Flags().Bool("all", false, "install all bundled plugins")
+	cmd.AddCommand(installCmd)
+
+	return cmd
 }
