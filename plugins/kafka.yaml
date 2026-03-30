@@ -1,5 +1,8 @@
 # Apache Kafka module handler
-# by neurosam.AI — https://neurosam.ai
+# Created by comchangs — Supported by neurosam.AI
+#
+# Versions can override commands, provision, and health check.
+# Unoverridden fields fall back to the plugin-level defaults.
 
 name: kafka
 description: Apache Kafka distributed event streaming platform
@@ -10,12 +13,30 @@ package:
   default_version: "3.7.0"
   url_template: "https://downloads.apache.org/kafka/{{VERSION}}/kafka_2.13-{{VERSION}}.tgz"
   versions:
-    "3.7.0": "https://downloads.apache.org/kafka/3.7.0/kafka_2.13-3.7.0.tgz"
+    # Latest — full override example (Java 17, new path)
+    "3.7.0":
+      url: "https://downloads.apache.org/kafka/3.7.0/kafka_2.13-3.7.0.tgz"
+      start_cmd: "{{BASE_DIR}}/current/kafka_2.13-3.7.0/bin/kafka-server-start.sh -daemon {{BASE_DIR}}/conf/server.properties"
+      stop_cmd: "{{BASE_DIR}}/current/kafka_2.13-3.7.0/bin/kafka-server-stop.sh"
+      provision:
+        packages: [openjdk-17-jre-headless]
+        directories: ["{{BASE_DIR}}/data/kafka-logs"]
+        commands: ["ulimit -n 65536 2>/dev/null || true"]
+
+    # Older versions — simple URL (uses plugin-level commands)
     "3.6.1": "https://downloads.apache.org/kafka/3.6.1/kafka_2.13-3.6.1.tgz"
     "3.5.2": "https://downloads.apache.org/kafka/3.5.2/kafka_2.13-3.5.2.tgz"
-    "3.4.0": "https://downloads.apache.org/kafka/3.4.0/kafka_2.13-3.4.0.tgz"
 
-build_cmd: ""
+    # Legacy version with different Java requirement
+    "3.4.0":
+      url: "https://downloads.apache.org/kafka/3.4.0/kafka_2.13-3.4.0.tgz"
+      start_cmd: "{{BASE_DIR}}/current/kafka_2.13-3.4.0/bin/kafka-server-start.sh -daemon {{BASE_DIR}}/conf/server.properties"
+      stop_cmd: "{{BASE_DIR}}/current/kafka_2.13-3.4.0/bin/kafka-server-stop.sh"
+      provision:
+        packages: [java-11-amazon-corretto-headless]
+        directories: ["{{BASE_DIR}}/data/kafka-logs"]
+
+# Fallback commands (used when version has no override)
 start_cmd: "{{BASE_DIR}}/current/bin/kafka-server-start.sh -daemon {{BASE_DIR}}/conf/server.properties"
 stop_cmd: "{{BASE_DIR}}/current/bin/kafka-server-stop.sh"
 status_cmd: "lsof -i :{{PORT}} -t 2>/dev/null"
@@ -31,6 +52,7 @@ health_check:
   target: ":{{PORT}}"
   timeout: 60
 
+# Fallback provision (used when version has no override)
 provision:
   packages:
     - openjdk-17-jre-headless

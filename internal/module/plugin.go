@@ -59,16 +59,50 @@ type PluginDef struct {
 
 // PackageInfo defines external package versioning
 type PackageInfo struct {
-	// Supported versions with download URLs
-	// e.g., "3.7.0": "https://downloads.apache.org/kafka/3.7.0/kafka_2.13-3.7.0.tgz"
-	Versions map[string]string `yaml:"versions"`
+	// Supported versions — value can be a URL string or a VersionOverride object
+	Versions map[string]VersionEntry `yaml:"versions"`
 
 	// Default version to use
 	DefaultVersion string `yaml:"default_version"`
 
 	// URL template: {{VERSION}} is replaced
-	// e.g., "https://downloads.apache.org/kafka/{{VERSION}}/kafka_2.13-{{VERSION}}.tgz"
 	URLTemplate string `yaml:"url_template"`
+}
+
+// VersionEntry holds either a simple URL string or a full override.
+// YAML supports both formats:
+//
+//	"3.7.0": "https://..."                          (simple URL)
+//	"3.7.0":                                        (full override)
+//	  url: "https://..."
+//	  start_cmd: "..."
+type VersionEntry struct {
+	URL         string             `yaml:"url"`
+	StartCmd    string             `yaml:"start_cmd"`
+	StopCmd     string             `yaml:"stop_cmd"`
+	StatusCmd   string             `yaml:"status_cmd"`
+	BuildCmd    string             `yaml:"build_cmd"`
+	Provision   *PluginProvision   `yaml:"provision"`
+	HealthCheck *PluginHealthCheck `yaml:"health_check"`
+}
+
+// UnmarshalYAML allows VersionEntry to accept both a plain string (URL) and a map
+func (v *VersionEntry) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	// Try string first (simple URL format)
+	var url string
+	if err := unmarshal(&url); err == nil {
+		v.URL = url
+		return nil
+	}
+
+	// Try struct (full override format)
+	type alias VersionEntry
+	var a alias
+	if err := unmarshal(&a); err != nil {
+		return err
+	}
+	*v = VersionEntry(a)
+	return nil
 }
 
 // PluginHealthCheck defines default health check for the plugin
@@ -97,19 +131,46 @@ type PluginHandler struct {
 
 func (h *PluginHandler) Name() string { return h.Def.Name }
 
+// versionOverride returns the override for the default version, if any
+func (h *PluginHandler) versionOverride() *VersionEntry {
+	ver := h.Def.Package.DefaultVersion
+	if ver == "" {
+		return nil
+	}
+	if entry, ok := h.Def.Package.Versions[ver]; ok {
+		// Only return if it has override fields (not just a URL)
+		if entry.StartCmd != "" || entry.StopCmd != "" || entry.StatusCmd != "" || entry.BuildCmd != "" || entry.Provision != nil {
+			return &entry
+		}
+	}
+	return nil
+}
+
 func (h *PluginHandler) DefaultBuildCmd(moduleName, env string) string {
+	if ov := h.versionOverride(); ov != nil && ov.BuildCmd != "" {
+		return h.substitute(ov.BuildCmd, moduleName, "", 0, env)
+	}
 	return h.substitute(h.Def.BuildCmd, moduleName, "", 0, env)
 }
 
 func (h *PluginHandler) DefaultStartCmd(baseDir string, port int) string {
+	if ov := h.versionOverride(); ov != nil && ov.StartCmd != "" {
+		return h.substitute(ov.StartCmd, "", baseDir, port, "")
+	}
 	return h.substitute(h.Def.StartCmd, "", baseDir, port, "")
 }
 
 func (h *PluginHandler) DefaultStopCmd(baseDir string, port int) string {
+	if ov := h.versionOverride(); ov != nil && ov.StopCmd != "" {
+		return h.substitute(ov.StopCmd, "", baseDir, port, "")
+	}
 	return h.substitute(h.Def.StopCmd, "", baseDir, port, "")
 }
 
 func (h *PluginHandler) DefaultStatusCmd(baseDir string, port int) string {
+	if ov := h.versionOverride(); ov != nil && ov.StatusCmd != "" {
+		return h.substitute(ov.StatusCmd, "", baseDir, port, "")
+	}
 	cmd := h.Def.StatusCmd
 	if cmd == "" {
 		if port > 0 {
@@ -211,6 +272,31 @@ func GetPluginDef(typeName string) *PluginDef {
 		return &ph.Def
 	}
 	return nil
+}
+
+// GetProvisionForVersion returns version-specific provision config, falling back to plugin defaults
+func GetProvisionForVersion(typeName, version string) *PluginProvision {
+	def := GetPluginDef(typeName)
+	if def == nil {
+		return nil
+	}
+
+	// Check version-specific override
+	if version != "" {
+		if entry, ok := def.Package.Versions[version]; ok && entry.Provision != nil {
+			return entry.Provision
+		}
+	}
+
+	// Check default version override
+	if def.Package.DefaultVersion != "" {
+		if entry, ok := def.Package.Versions[def.Package.DefaultVersion]; ok && entry.Provision != nil {
+			return entry.Provision
+		}
+	}
+
+	// Fallback to plugin-level provision
+	return &def.Provision
 }
 
 // PluginDirs returns the default plugin directories to search

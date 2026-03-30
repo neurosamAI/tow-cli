@@ -303,11 +303,24 @@ version: "1.0.0"
 author: Your Name
 
 package:
-  default_version: "3.7.0"
+  default_version: "2.0.0"
   url_template: "https://example.com/releases/{{VERSION}}/myservice-{{VERSION}}.tar.gz"
   versions:
-    "3.7.0": "https://example.com/releases/3.7.0/myservice-3.7.0.tar.gz"
+    # Simple: just a URL (uses plugin-level commands)
+    "2.0.0": "https://example.com/releases/2.0.0/myservice-2.0.0.tar.gz"
 
+    # Full override: version-specific commands, provision, health check
+    "1.8.0":
+      url: "https://example.com/releases/1.8.0/myservice-1.8.0.tar.gz"
+      start_cmd: "{{BASE_DIR}}/current/myservice-1.8.0/bin/start --port {{PORT}}"
+      stop_cmd: "{{BASE_DIR}}/current/myservice-1.8.0/bin/stop"
+      provision:
+        packages: [libssl1.1]    # older version needs older lib
+      health_check:
+        type: tcp                 # v1.x had no HTTP health endpoint
+        timeout: 30
+
+# Fallback commands (used when version has no override)
 start_cmd: "{{BASE_DIR}}/current/bin/myservice --port {{PORT}}"
 stop_cmd: "kill $(cat {{BASE_DIR}}/myservice.pid) 2>/dev/null || true"
 status_cmd: "curl -sf http://localhost:{{PORT}}/health"
