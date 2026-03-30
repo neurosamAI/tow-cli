@@ -33,6 +33,16 @@
 
     if (toggle) toggle.addEventListener('click', openSidebar);
     if (overlay) overlay.addEventListener('click', closeSidebar);
+
+    // Auto-fetch latest version from GitHub
+    fetch('https://api.github.com/repos/neurosamAI/tow-cli/tags?per_page=1')
+      .then(r => r.json())
+      .then(tags => {
+        if (tags[0] && tags[0].name) {
+          document.querySelectorAll('[id="tow-version"]').forEach(el => el.textContent = tags[0].name);
+        }
+      })
+      .catch(() => {});
   </script>
 </body>
 </html>

@@ -20,10 +20,16 @@ Tow is a **lightweight, agentless deployment orchestrator** written in Go. It de
 tow init
 
 # Deploy to production
-tow deploy -e prod -m api-server
+tow auto -e prod -m api-server
 
 # Instant rollback
 tow rollback -e prod -m api-server
+
+# Run commands on all servers
+tow ssh -e prod -m kafka --all -- "df -h"
+
+# Compare deployed vs local before deploying
+tow diff -e prod -m api-server
 ```
 
 <div class="features">
@@ -50,6 +56,14 @@ tow rollback -e prod -m api-server
   <div class="feature">
     <h3>Parallel & Safe</h3>
     <p>Deploy to multiple servers simultaneously. Built-in deploy locks prevent concurrent deploys.</p>
+  </div>
+  <div class="feature">
+    <h3>Multi-Server Ops</h3>
+    <p><code>tow ssh</code>, <code>tow logs --all</code>, <code>tow diff</code> — run ad-hoc commands, stream logs from all servers, and compare deployed vs local code.</p>
+  </div>
+  <div class="feature">
+    <h3>AI Agent Native</h3>
+    <p>Built-in MCP Server for Claude, Cursor, Windsurf. Deploy and monitor with natural language commands.</p>
   </div>
 </div>
 
@@ -96,6 +110,8 @@ tow auto -e dev -m my-project
 | Multi-language native | **12 types** | Manual | Ruby-first | Docker-only |
 | Built-in health checks | **4 types** | Manual | Plugin | HTTP only |
 | Instant rollback | **Symlink** | Re-run playbook | Symlink | Container swap |
+| Multi-server log streaming | **Yes** | No | No | No |
+| Pre-deploy diff | **Yes** | No | No | No |
 | AI agent support (MCP) | **Yes** | No | No | No |
 
 <p style="text-align: center; margin-top: 1rem;">
@@ -160,7 +176,7 @@ Tow auto-detects everything — language, framework, build tool, monorepo module
 
 ## Born from Real Experience
 
-Tow is the Go rewrite of bash-based deployment systems used across multiple companies and projects — managing Spring Boot microservices, Kafka clusters, Redis, and monitoring stacks. The patterns are proven; the Go implementation is new (v0.1.0).
+Tow is the Go rewrite of bash-based deployment systems used across multiple companies and projects — managing Spring Boot microservices, Kafka clusters, Redis, and monitoring stacks. The patterns are proven; the Go implementation has been validated on 22 production servers.
 
 Every feature exists because a real production incident demanded it:
 
