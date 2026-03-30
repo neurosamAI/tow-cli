@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v3"
 
@@ -83,6 +84,7 @@ Supported by neurosam.AI — https://neurosam.ai`,
 		newSSHCmd(),
 		newDiffCmd(),
 		newConfigCmd(),
+		newMetricsCmd(),
 		newDoctorCmd(),
 		newMCPServerCmd(),
 	)
@@ -1915,6 +1917,150 @@ func fetchURL(url string) ([]byte, error) {
 	}
 
 	return io.ReadAll(resp.Body)
+}
+
+func newMetricsCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "metrics",
+		Short: "Show deployment metrics from audit log",
+		Long: `Analyze .tow/audit.log to show deployment frequency, success rate, and trends.
+
+Examples:
+  tow metrics
+  tow metrics -e prod
+  tow metrics -e prod -m api-server
+  tow metrics --days 30`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			envFilter, _ := cmd.Flags().GetString("environment")
+			modFilter, _ := cmd.Flags().GetString("module")
+			days, _ := cmd.Flags().GetInt("days")
+
+			auditFile := ".tow/audit.log"
+			data, err := os.ReadFile(auditFile)
+			if err != nil {
+				return fmt.Errorf("no audit log found at %s — deploy something first", auditFile)
+			}
+
+			type entry struct {
+				time   time.Time
+				env    string
+				module string
+				action string
+				detail string
+			}
+
+			cutoff := time.Now().AddDate(0, 0, -days)
+			var entries []entry
+			moduleCounts := make(map[string]int)
+			actionCounts := make(map[string]int)
+			dayCounts := make(map[string]int)
+
+			for _, line := range strings.Split(string(data), "\n") {
+				if line == "" {
+					continue
+				}
+
+				parts := strings.Split(line, " | ")
+				if len(parts) < 5 {
+					continue
+				}
+
+				ts, err := time.Parse("2006-01-02T15:04:05Z", strings.TrimSpace(parts[0]))
+				if err != nil {
+					continue
+				}
+
+				if ts.Before(cutoff) {
+					continue
+				}
+
+				e := entry{time: ts}
+				for _, p := range parts[1:] {
+					kv := strings.SplitN(strings.TrimSpace(p), "=", 2)
+					if len(kv) != 2 {
+						continue
+					}
+					switch kv[0] {
+					case "env":
+						e.env = kv[1]
+					case "module":
+						e.module = kv[1]
+					case "action":
+						e.action = kv[1]
+					}
+				}
+
+				if envFilter != "" && e.env != envFilter {
+					continue
+				}
+				if modFilter != "" && e.module != modFilter {
+					continue
+				}
+
+				entries = append(entries, e)
+				moduleCounts[e.module]++
+				actionCounts[e.action]++
+				dayCounts[ts.Weekday().String()[:3]]++
+			}
+
+			if len(entries) == 0 {
+				fmt.Println("No deployments found in the specified period.")
+				return nil
+			}
+
+			// Summary
+			fmt.Printf("\nDeployments (last %d days):\n", days)
+			fmt.Printf("  Total:        %d\n", len(entries))
+
+			// By action
+			fmt.Printf("\nBy action:\n")
+			for action, count := range actionCounts {
+				fmt.Printf("  %-12s  %d\n", action, count)
+			}
+
+			// By module
+			fmt.Printf("\nBy module:\n")
+			maxCount := 0
+			for _, c := range moduleCounts {
+				if c > maxCount {
+					maxCount = c
+				}
+			}
+			for mod, count := range moduleCounts {
+				bar := strings.Repeat("█", count*20/max(maxCount, 1))
+				fmt.Printf("  %-30s  %s %d\n", mod, bar, count)
+			}
+
+			// By day of week
+			fmt.Printf("\nBy day:\n")
+			weekdays := []string{"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"}
+			maxDay := 0
+			for _, c := range dayCounts {
+				if c > maxDay {
+					maxDay = c
+				}
+			}
+			for _, day := range weekdays {
+				count := dayCounts[day]
+				if count > 0 {
+					bar := strings.Repeat("█", count*20/max(maxDay, 1))
+					fmt.Printf("  %s  %s %d\n", day, bar, count)
+				}
+			}
+
+			fmt.Println()
+			return nil
+		},
+	}
+	cmd.Flags().Int("days", 30, "number of days to analyze")
+	return cmd
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
 
 func newDoctorCmd() *cobra.Command {

@@ -1009,9 +1009,9 @@ func (d *Deployer) WriteAuditLog(envName, moduleName, action, detail string) {
 
 	os.MkdirAll(auditDir, 0755)
 
-	currentUser := "unknown"
-	if u, err := os.Hostname(); err == nil {
-		currentUser = u
+	currentUser := os.Getenv("USER")
+	if currentUser == "" {
+		currentUser = "unknown"
 	}
 
 	entry := fmt.Sprintf("%s | user=%s | env=%s | module=%s | action=%s | %s\n",
