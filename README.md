@@ -296,30 +296,42 @@ Copy [`integrations/claude-skill/tow-deploy.md`](integrations/claude-skill/tow-d
 
 See [`integrations/vscode/`](integrations/vscode/) — sidebar UI with environments, modules, and deployment controls.
 
+## Production-Tested
+
+Tow has been validated on **real production infrastructure** at [Balkari Inc.](https://balkari.com), managing:
+
+- **22 servers** across Spring Boot microservices, Kafka clusters, Redis, MongoDB, Prometheus, Grafana, and more
+- **Multi-server operations**: status checks across 3-node Kafka cluster, multiplexed log viewing, parallel SSH execution
+- **Legacy compatibility**: seamlessly manages existing deployments created by bash scripts (deploy_path `{module}-{server}`)
+
+```
+$ tow doctor -e prod -m api-server
+  ✓ tow.yaml is valid
+  ✓ Environment 'prod' exists
+  ✓ SSH key exists
+  ✓ Servers configured (22)
+  ✓ SSH connection successful
+  ✓ Remote dir exists
+  ✓ Disk space — Available: 4.9G
+  ✓ Branch policy
+  ✓ No active deploy lock
+  9 passed, 0 failed
+```
+
 ## Current Status
 
-Tow is at **v0.2.0** — it's functional and actively developed, but early-stage. Here's what to expect:
+Tow is at **v0.2.0** — production-tested and actively developed.
 
-**What works well:**
-- Project auto-detection and config generation (10 languages, 40+ frameworks, 35 infrastructure plugins)
-- Full deployment pipeline over SSH (build → package → upload → install → restart)
-- Symlink-based instant rollback
-- Parallel execution, rolling deploy, auto-rollback
-- Health checks, deploy locking, branch policies
-- YAML plugin system for infrastructure services
-
-**Known limitations (v0.1.0):**
-- No resume for interrupted large file uploads — failed uploads must restart from scratch
-- `tow init` generates a config skeleton — you still need to edit server IPs and SSH key paths
+**Known limitations:**
+- No resume for interrupted large file uploads
 - No blue-green deployment strategy yet (rolling deploy is supported)
 - IDE plugins (VS Code, JetBrains) are functional but early-stage
-- Test coverage is ~42% overall (87-100% for pure logic, lower for SSH-dependent code pending interface refactoring)
 
 **Roadmap to v1.0:**
-- SSH interface abstraction for testability (target: 80%+ coverage)
 - Blue-green deployment strategy
 - Web dashboard for deployment status
 - Config encryption for sensitive values
+- SSH interface abstraction for 80%+ test coverage
 
 If you hit an issue, please [open a GitHub issue](https://github.com/neurosamAI/tow-cli/issues). We take bug reports seriously.
 
