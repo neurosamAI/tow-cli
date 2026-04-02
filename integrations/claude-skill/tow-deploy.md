@@ -50,8 +50,16 @@ tow config assign -e <env> --server srv --modules mod1,mod2
 tow config unassign -e <env> --server srv --modules mod1
 ```
 
-### Maintenance
+### Multi-Module Monitoring
 ```bash
+tow logs -e <env> -m kafka,zookeeper --all -n 10    # Multiple modules at once
+tow logs -e <env> -m kafka,zookeeper --all -F       # Stream multiple modules
+```
+
+### Metrics & Maintenance
+```bash
+tow metrics                                          # Deployment stats (last 30 days)
+tow metrics -e <env> -m <module> --days 7           # Filtered metrics
 tow cleanup -e <env> -m <module> --keep 3           # Clean old deploys
 tow threaddump -e <env> -m <module>                 # Java thread dump
 tow provision -e <env> -m <module> --jre --tools    # Server setup

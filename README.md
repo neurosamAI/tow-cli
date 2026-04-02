@@ -365,7 +365,7 @@ $ tow doctor -e prod -m api-server
 
 ## Current Status
 
-Tow is at **v0.2.0** — production-tested and actively developed.
+Tow is at **v0.3.0** — production-tested and actively developed.
 
 **Known limitations:**
 - No resume for interrupted large file uploads

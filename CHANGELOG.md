@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-04-02
+
+### Added
+- `tow metrics` — deployment frequency, action breakdown, module breakdown with bar chart from audit log
+- `tow logs -m kafka,zookeeper` — multi-module log viewing with color-coded [module/server] prefixes
+- Interactive server/module selection — bidirectional picker when -m or -s is omitted
+  - `-m` only → pick server from list
+  - `-s` only → pick module from server's assigned modules
+  - neither → pick module first, then server
+- `tow plugin add/remove` — community plugin ecosystem from GitHub repos or URLs
+- Version pinning for plugin modules (`version:` field in tow.yaml, warns if unset)
+- Version-specific overrides in plugin YAML (per-version commands, provision, health check)
+- Production-Tested section in README (Balkari Inc., 22 servers)
+- VS Code extension published: neurosamai.tow-cli on VS Code Marketplace
+
+### Fixed
+- Audit log records OS username instead of hostname
+- Unused code removed (findUnsetEnvVars, detail field) to pass lint
+
 ## [0.2.0] - 2026-03-30
 
 ### Added
