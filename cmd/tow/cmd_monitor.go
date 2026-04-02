@@ -639,10 +639,10 @@ func newDoctorCmd() *cobra.Command {
 				srv := env.Servers[0]
 				depCheck := `
 MISSING=""
-for cmd in bash tar; do
+for cmd in bash tar lsof curl; do
     command -v $cmd >/dev/null 2>&1 || MISSING="$MISSING $cmd(REQUIRED)"
 done
-for cmd in lsof curl nc; do
+for cmd in nc; do
     command -v $cmd >/dev/null 2>&1 || MISSING="$MISSING $cmd(recommended)"
 done
 if [ -z "$MISSING" ]; then
@@ -681,16 +681,19 @@ fi
 							}
 
 							if strings.Contains(p, "REQUIRED") {
-								fmt.Printf("    %s✗ %s — required. Fix: %s%s\n", logger.ColorRed, toolName, installCmd, logger.ColorReset)
+								impact := ""
+								switch toolName {
+								case "lsof":
+									impact = " — tow status, tow stop, tow threaddump will not work"
+								case "curl":
+									impact = " — tow start (HTTP health check), tow doctor will not work"
+								}
+								fmt.Printf("    %s✗ %s — required%s. Fix: %s%s\n", logger.ColorRed, toolName, impact, installCmd, logger.ColorReset)
 							} else {
 								impact := ""
 								switch toolName {
 								case "nc":
-									impact = " → affects: tow start (TCP health check falls back to bash /dev/tcp)"
-								case "lsof":
-									impact = " → affects: tow status, tow stop, tow threaddump (PID detection by port)"
-								case "curl":
-									impact = " → affects: tow start (HTTP health check), tow doctor (HTTP endpoint check)"
+									impact = " → tow start TCP health check falls back to bash /dev/tcp"
 								}
 								fmt.Printf("    %s! %s — recommended%s. Fix: %s%s\n", logger.ColorYellow, toolName, impact, installCmd, logger.ColorReset)
 							}
