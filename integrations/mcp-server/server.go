@@ -417,15 +417,6 @@ func (s *Server) handleMetrics(args map[string]interface{}) (string, error) {
 
 	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
 
-	// Parse and filter entries
-	type entry struct {
-		action string
-		module string
-	}
-
-	cutoff := fmt.Sprintf("%d-", days) // simplified; real impl would use time parsing
-	_ = cutoff
-
 	actionCounts := map[string]int{}
 	moduleCounts := map[string]int{}
 	total := 0
