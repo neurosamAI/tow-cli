@@ -686,11 +686,11 @@ fi
 								impact := ""
 								switch toolName {
 								case "nc":
-									impact = " (TCP health check will fall back to bash /dev/tcp)"
+									impact = " → affects: tow start (TCP health check falls back to bash /dev/tcp)"
 								case "lsof":
-									impact = " (status/stop by port will not work)"
+									impact = " → affects: tow status, tow stop, tow threaddump (PID detection by port)"
 								case "curl":
-									impact = " (HTTP health check will not work)"
+									impact = " → affects: tow start (HTTP health check), tow doctor (HTTP endpoint check)"
 								}
 								fmt.Printf("    %s! %s — recommended%s. Fix: %s%s\n", logger.ColorYellow, toolName, impact, installCmd, logger.ColorReset)
 							}
