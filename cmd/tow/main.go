@@ -182,6 +182,136 @@ func pickServer(servers []config.Server) (config.Server, error) {
 	return servers[idx-1], nil
 }
 
+// pickModule prompts the user to select a module from a list
+func pickModule(modules []string) (string, error) {
+	if len(modules) == 1 {
+		return modules[0], nil
+	}
+
+	fmt.Fprintf(os.Stderr, "\nMultiple modules available:\n")
+	for i, mod := range modules {
+		fmt.Fprintf(os.Stderr, "  [%d] %s\n", i+1, mod)
+	}
+	fmt.Fprintf(os.Stderr, "\nSelect module [1-%d]: ", len(modules))
+
+	reader := bufio.NewReader(os.Stdin)
+	input, _ := reader.ReadString('\n')
+	input = strings.TrimSpace(input)
+
+	var idx int
+	if _, err := fmt.Sscanf(input, "%d", &idx); err != nil || idx < 1 || idx > len(modules) {
+		return "", fmt.Errorf("invalid selection: %s", input)
+	}
+
+	return modules[idx-1], nil
+}
+
+// resolveTargetsInteractive resolves environment, module, and server with interactive selection.
+// - env required
+// - if -m given but not -s: pick server (if multiple)
+// - if -s given but not -m: pick module (from server's module list)
+// - if neither -m nor -s: pick module first, then server
+func resolveTargetsInteractive(cmd *cobra.Command, cfg *config.Config) (envName, modName string, serverNum int, err error) {
+	envName, _ = cmd.Flags().GetString("environment")
+	modName, _ = cmd.Flags().GetString("module")
+	serverFlag, _ := cmd.Flags().GetString("server")
+
+	if envName == "" {
+		return "", "", 0, fmt.Errorf("environment (-e) is required")
+	}
+
+	envCfg, ok := cfg.Environments[envName]
+	if !ok {
+		return "", "", 0, fmt.Errorf("environment %q not found in config", envName)
+	}
+
+	// Case 1: server given but not module → pick module from server's list
+	if modName == "" && serverFlag != "" {
+		// Find the server
+		var targetSrv *config.Server
+		for i := range envCfg.Servers {
+			if envCfg.Servers[i].ID() == serverFlag {
+				targetSrv = &envCfg.Servers[i]
+				break
+			}
+		}
+		if targetSrv == nil {
+			return "", "", 0, fmt.Errorf("server %q not found in environment %q", serverFlag, envName)
+		}
+
+		if len(targetSrv.Modules) == 0 {
+			return "", "", 0, fmt.Errorf("server %q has no modules assigned", serverFlag)
+		}
+
+		modName, err = pickModule(targetSrv.Modules)
+		if err != nil {
+			return "", "", 0, err
+		}
+		serverNum = targetSrv.Number
+		return envName, modName, serverNum, nil
+	}
+
+	// Case 2: module given but not server → pick server (if multiple)
+	if modName != "" && serverFlag == "" {
+		servers, _, err := cfg.GetServersForModule(envName, modName, 0)
+		if err != nil {
+			return "", "", 0, err
+		}
+		if len(servers) > 1 {
+			srv, err := pickServer(servers)
+			if err != nil {
+				return "", "", 0, err
+			}
+			serverNum = srv.Number
+		}
+
+		// Parse serverFlag if present
+		if serverFlag != "" {
+			fmt.Sscanf(serverFlag, "%d", &serverNum)
+		}
+		return envName, modName, serverNum, nil
+	}
+
+	// Case 3: neither module nor server → pick module first
+	if modName == "" && serverFlag == "" {
+		var moduleNames []string
+		for name := range cfg.Modules {
+			moduleNames = append(moduleNames, name)
+		}
+		if len(moduleNames) == 0 {
+			return "", "", 0, fmt.Errorf("no modules configured")
+		}
+
+		modName, err = pickModule(moduleNames)
+		if err != nil {
+			return "", "", 0, err
+		}
+
+		// Then pick server
+		servers, _, err := cfg.GetServersForModule(envName, modName, 0)
+		if err != nil {
+			return "", "", 0, err
+		}
+		if len(servers) > 1 {
+			srv, err := pickServer(servers)
+			if err != nil {
+				return "", "", 0, err
+			}
+			serverNum = srv.Number
+		}
+		return envName, modName, serverNum, nil
+	}
+
+	// Case 4: both given → parse server flag
+	if serverFlag != "" {
+		if n, e := fmt.Sscanf(serverFlag, "%d", &serverNum); n == 0 || e != nil {
+			serverNum = -1
+		}
+	}
+
+	return envName, modName, serverNum, nil
+}
+
 // confirmProdDeploy asks for user confirmation when deploying to production-like environments
 func confirmProdDeploy(cmd *cobra.Command, envName, moduleName, command string) bool {
 	// Skip confirmation in dry-run mode
@@ -1050,25 +1180,9 @@ func newLoginCmd() *cobra.Command {
 			}
 			insecure, _ := cmd.Flags().GetBool("insecure")
 
-			envName, modName, serverNum, err := resolveTargets(cmd, cfg)
+			envName, modName, serverNum, err := resolveTargetsInteractive(cmd, cfg)
 			if err != nil {
 				return err
-			}
-
-			// If no server specified and multiple exist, let user pick
-			serverFlag, _ := cmd.Flags().GetString("server")
-			if serverFlag == "" {
-				servers, _, err := cfg.GetServersForModule(envName, modName, 0)
-				if err != nil {
-					return err
-				}
-				if len(servers) > 1 {
-					srv, err := pickServer(servers)
-					if err != nil {
-						return err
-					}
-					serverNum = srv.Number
-				}
 			}
 
 			sshMgr := ssh.NewManager(insecure)
@@ -1150,22 +1264,9 @@ Examples:
 			}
 			defer sshMgr.Close()
 
-			env, mod, server, err := resolveTargets(cmd, cfg)
+			env, mod, server, err := resolveTargetsInteractive(cmd, cfg)
 			if err != nil {
 				return err
-			}
-
-			// Interactive server selection if multiple match
-			serverFlag, _ := cmd.Flags().GetString("server")
-			if serverFlag == "" {
-				servers, _, err := cfg.GetServersForModule(env, mod, 0)
-				if err == nil && len(servers) > 1 {
-					srv, err := pickServer(servers)
-					if err != nil {
-						return err
-					}
-					server = srv.Number
-				}
 			}
 
 			localDir, _ := cmd.Flags().GetString("dir")
@@ -1693,21 +1794,9 @@ func newThreadDumpCmd() *cobra.Command {
 			}
 			defer sshMgr.Close()
 
-			env, mod, server, err := resolveTargets(cmd, cfg)
+			env, mod, server, err := resolveTargetsInteractive(cmd, cfg)
 			if err != nil {
 				return err
-			}
-
-			serverFlag, _ := cmd.Flags().GetString("server")
-			if serverFlag == "" {
-				servers, _, err := cfg.GetServersForModule(env, mod, 0)
-				if err == nil && len(servers) > 1 {
-					srv, err := pickServer(servers)
-					if err != nil {
-						return err
-					}
-					server = srv.Number
-				}
 			}
 
 			deployer := deploy.New(cfg, sshMgr)
