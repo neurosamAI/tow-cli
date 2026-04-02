@@ -121,14 +121,15 @@ type HealthCheckConfig struct {
 
 // HooksConfig defines lifecycle hooks
 type HooksConfig struct {
-	PreBuild   string `yaml:"pre_build"`
-	PostBuild  string `yaml:"post_build"`
-	PreDeploy  string `yaml:"pre_deploy"`
-	PostDeploy string `yaml:"post_deploy"`
-	PreStart   string `yaml:"pre_start"`
-	PostStart  string `yaml:"post_start"`
-	PreStop    string `yaml:"pre_stop"`
-	PostStop   string `yaml:"post_stop"`
+	PreBuild    string `yaml:"pre_build"`
+	PostBuild   string `yaml:"post_build"`
+	PreDeploy   string `yaml:"pre_deploy"`
+	PostDeploy  string `yaml:"post_deploy"`
+	PostInstall string `yaml:"post_install"` // runs after extract + symlink, before start (venv setup, pip install, etc.)
+	PreStart    string `yaml:"pre_start"`
+	PostStart   string `yaml:"post_start"`
+	PreStop     string `yaml:"pre_stop"`
+	PostStop    string `yaml:"post_stop"`
 }
 
 // Defaults provides default values for environments and modules

@@ -222,6 +222,13 @@ TOWEOF
 
 		logger.Success("[%s] Installed → deploy/%s (symlinked to current)", srv.Host, ts)
 
+		// post_install hook — runs after extract + symlink (venv setup, pip install, db migration, etc.)
+		if mod.Hooks.PostInstall != "" {
+			logger.ServerAction(srv.Host, "Running post_install hook")
+			hookCmd := fmt.Sprintf("cd %s/current && %s", baseDir, mod.Hooks.PostInstall)
+			d.execHook(env, srv.Host, "post_install", hookCmd)
+		}
+
 		if mod.Hooks.PostDeploy != "" {
 			d.execHook(env, srv.Host, "post_deploy", mod.Hooks.PostDeploy)
 		}

@@ -634,14 +634,61 @@ func newDoctorCmd() *cobra.Command {
 				})
 			}
 
-			// 7. Branch check
+			// 7. Server dependencies
+			if len(env.Servers) > 0 {
+				srv := env.Servers[0]
+				depCheck := `
+MISSING=""
+for cmd in bash tar; do
+    command -v $cmd >/dev/null 2>&1 || MISSING="$MISSING $cmd(REQUIRED)"
+done
+for cmd in lsof curl nc; do
+    command -v $cmd >/dev/null 2>&1 || MISSING="$MISSING $cmd(recommended)"
+done
+if [ -z "$MISSING" ]; then
+    echo "ALL_OK"
+else
+    echo "MISSING:$MISSING"
+fi
+`
+				check(fmt.Sprintf("Server dependencies on %s", srv.Host), func() error {
+					result, err := sshMgr.Exec(env, srv.Host, depCheck)
+					if err != nil {
+						return err
+					}
+					out := strings.TrimSpace(result.Stdout)
+					if strings.Contains(out, "ALL_OK") {
+						return nil
+					}
+					if strings.Contains(out, "MISSING:") {
+						missing := strings.TrimPrefix(out, "MISSING:")
+						parts := strings.Fields(missing)
+						for _, p := range parts {
+							if strings.Contains(p, "REQUIRED") {
+								fmt.Printf("    %s%s — install required%s\n", logger.ColorRed, p, logger.ColorReset)
+							} else {
+								fmt.Printf("    %s%s — recommended%s\n", logger.ColorYellow, p, logger.ColorReset)
+							}
+						}
+						// Only fail if REQUIRED tools are missing
+						for _, p := range parts {
+							if strings.Contains(p, "REQUIRED") {
+								return fmt.Errorf("required tools missing: %s", missing)
+							}
+						}
+					}
+					return nil
+				})
+			}
+
+			// 8. Branch check
 			if modName != "" {
 				check("Branch policy", func() error {
 					return deploy.CheckBranch(cfg, envName, "deploy")
 				})
 			}
 
-			// 8. No active lock
+			// 9. No active lock
 			if modName != "" && len(env.Servers) > 0 {
 				servers, _, _ := cfg.GetServersForModule(envName, modName, 0)
 				if len(servers) > 0 {
