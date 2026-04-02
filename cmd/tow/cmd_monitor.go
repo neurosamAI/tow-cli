@@ -663,14 +663,39 @@ fi
 					if strings.Contains(out, "MISSING:") {
 						missing := strings.TrimPrefix(out, "MISSING:")
 						parts := strings.Fields(missing)
+
+						// Detect package manager for install guidance
+						pmResult, _ := sshMgr.Exec(env, srv.Host, "command -v yum >/dev/null && echo yum || (command -v apt-get >/dev/null && echo apt || echo unknown)")
+						pm := strings.TrimSpace(pmResult.Stdout)
+
 						for _, p := range parts {
+							toolName := strings.Split(p, "(")[0]
+							var installCmd string
+							switch pm {
+							case "yum":
+								installCmd = fmt.Sprintf("sudo yum install -y %s", toolName)
+							case "apt":
+								installCmd = fmt.Sprintf("sudo apt-get install -y %s", toolName)
+							default:
+								installCmd = fmt.Sprintf("install %s manually", toolName)
+							}
+
 							if strings.Contains(p, "REQUIRED") {
-								fmt.Printf("    %s%s — install required%s\n", logger.ColorRed, p, logger.ColorReset)
+								fmt.Printf("    %s✗ %s — required. Fix: %s%s\n", logger.ColorRed, toolName, installCmd, logger.ColorReset)
 							} else {
-								fmt.Printf("    %s%s — recommended%s\n", logger.ColorYellow, p, logger.ColorReset)
+								impact := ""
+								switch toolName {
+								case "nc":
+									impact = " (TCP health check will fall back to bash /dev/tcp)"
+								case "lsof":
+									impact = " (status/stop by port will not work)"
+								case "curl":
+									impact = " (HTTP health check will not work)"
+								}
+								fmt.Printf("    %s! %s — recommended%s. Fix: %s%s\n", logger.ColorYellow, toolName, impact, installCmd, logger.ColorReset)
 							}
 						}
-						// Only fail if REQUIRED tools are missing
+
 						for _, p := range parts {
 							if strings.Contains(p, "REQUIRED") {
 								return fmt.Errorf("required tools missing: %s", missing)
