@@ -34,6 +34,51 @@ tow auto -e prod -m api-server        # Build → package → upload → deploy
 tow rollback -e prod -m api-server    # Instant rollback
 ```
 
+<details>
+<summary><b>See it in action — real production output</b></summary>
+
+```
+$ tow status -e prod -m api-server -o json
+[
+  {
+    "host": "3.34.xx.xxx",
+    "server": "api-1",
+    "status": "running",
+    "pid": "23117",
+    "uptime": "56-01:58:33",
+    "memory": "962468KB",
+    "deployment": "20240424-110212"
+  }
+]
+
+$ tow logs -e prod -m kafka --all -n 3
+[kafka-1] 2026-03-30 14:35:49 GC(7722152) Pause Young 765M→702M(1024M) 17ms
+[kafka-2] 2026-03-30 14:35:55 GC(8629812) Pause Young 340M→292M(1024M) 18ms
+[kafka-3] 2026-03-30 14:36:01 GC(7493779) Pause Young 797M→723M(1024M) 13ms
+
+$ tow ssh -e prod -m kafka --all -- "free -h | head -2"
+[kafka-1]              total        used        free
+[kafka-1] Mem:         1.9Gi       1.7Gi        66Mi
+[kafka-2]              total        used        free
+[kafka-2] Mem:         1.9Gi       1.7Gi        77Mi
+[kafka-3]              total        used        free
+[kafka-3] Mem:         1.9Gi       1.7Gi        70Mi
+
+$ tow doctor -e prod -m api-server
+  ✓ tow.yaml is valid
+  ✓ Environment 'prod' exists
+  ✓ SSH key exists
+  ✓ Servers configured (22)
+  ✓ SSH connection successful
+  ✓ Remote dir exists
+  ✓ Disk space — Available: 4.9G
+  ✓ Branch policy
+  ✓ No active deploy lock
+  9 passed, 0 failed
+```
+
+</details>
+
 ## Why Tow?
 
 | | Tow | Ansible | Capistrano | Kamal |
@@ -203,6 +248,9 @@ Local Machine                    Remote Server
 | `tow status` | Check module status (PID, uptime, memory) |
 | `tow rollback` | Switch to previous deployment |
 | `tow logs` | Stream remote logs with optional grep filter |
+| `tow ssh` | Execute commands on remote servers |
+| `tow diff` | Compare deployed vs local code |
+| `tow config` | Manage servers, modules, and assignments |
 | `tow upload` | Upload a file to target servers |
 | `tow install` | Install uploaded package (extract + symlink) |
 | `tow login` | SSH into a server |
@@ -211,6 +259,8 @@ Local Machine                    Remote Server
 | `tow cleanup` | Remove old deployment directories |
 | `tow download` | Download files from remote servers |
 | `tow provision` | Provision a new server (timezone, JRE, tools) |
+| `tow metrics` | Show deployment statistics from audit log |
+| `tow doctor` | Pre-flight diagnostics |
 | `tow mcp-server` | Start MCP server for AI agent integration |
 
 **Advanced flags:**
@@ -241,7 +291,16 @@ tow status -o json            # Machine-readable JSON output
 | `elixir` | `mix deps.get, compile, release` | TCP port check |
 | `generic` | — | TCP port check |
 
-Infrastructure services are supported via [35 YAML plugins](plugins/) — Kafka, Redis, MySQL, PostgreSQL, MongoDB, Elasticsearch, ZooKeeper, Nginx, Prometheus, Grafana, Loki, Vault, Jenkins, and more. Community can add new services without writing Go code.
+Infrastructure services are supported via [35 bundled YAML plugins](plugins/) — Kafka, Redis, MySQL, PostgreSQL, MongoDB, Elasticsearch, ZooKeeper, Nginx, Prometheus, Grafana, Loki, Vault, Jenkins, and more.
+
+Community plugins can be installed from GitHub:
+
+```bash
+tow plugin add someuser/tow-plugin-mssql          # GitHub repo
+tow plugin add myorg/infra-plugins/oracle.yaml     # specific file
+tow plugin add https://example.com/custom.yaml     # any URL
+tow plugin list                                     # list all (bundled + external)
+```
 
 ## Documentation
 
@@ -283,30 +342,42 @@ Copy [`integrations/claude-skill/tow-deploy.md`](integrations/claude-skill/tow-d
 
 See [`integrations/vscode/`](integrations/vscode/) — sidebar UI with environments, modules, and deployment controls.
 
+## Production-Tested
+
+Tow has been validated on **real production infrastructure** at [Balkari Inc.](https://balkari.io), managing:
+
+- **22 servers** across Spring Boot microservices, Kafka clusters, Redis, MongoDB, Prometheus, Grafana, and more
+- **Multi-server operations**: status checks across 3-node Kafka cluster, multiplexed log viewing, parallel SSH execution
+- **Legacy compatibility**: seamlessly manages existing deployments created by bash scripts (deploy_path `{module}-{server}`)
+
+```
+$ tow doctor -e prod -m api-server
+  ✓ tow.yaml is valid
+  ✓ Environment 'prod' exists
+  ✓ SSH key exists
+  ✓ Servers configured (22)
+  ✓ SSH connection successful
+  ✓ Remote dir exists
+  ✓ Disk space — Available: 4.9G
+  ✓ Branch policy
+  ✓ No active deploy lock
+  9 passed, 0 failed
+```
+
 ## Current Status
 
-Tow is at **v0.1.0** — it's functional and actively developed, but early-stage. Here's what to expect:
+Tow is at **v0.3.0** — production-tested and actively developed.
 
-**What works well:**
-- Project auto-detection and config generation (10 languages, 40+ frameworks, 35 infrastructure plugins)
-- Full deployment pipeline over SSH (build → package → upload → install → restart)
-- Symlink-based instant rollback
-- Parallel execution, rolling deploy, auto-rollback
-- Health checks, deploy locking, branch policies
-- YAML plugin system for infrastructure services
-
-**Known limitations (v0.1.0):**
-- No resume for interrupted large file uploads — failed uploads must restart from scratch
-- `tow init` generates a config skeleton — you still need to edit server IPs and SSH key paths
+**Known limitations:**
+- No resume for interrupted large file uploads
 - No blue-green deployment strategy yet (rolling deploy is supported)
 - IDE plugins (VS Code, JetBrains) are functional but early-stage
-- Test coverage is ~42% overall (87-100% for pure logic, lower for SSH-dependent code pending interface refactoring)
 
 **Roadmap to v1.0:**
-- SSH interface abstraction for testability (target: 80%+ coverage)
 - Blue-green deployment strategy
 - Web dashboard for deployment status
 - Config encryption for sensitive values
+- SSH interface abstraction for 80%+ test coverage
 
 If you hit an issue, please [open a GitHub issue](https://github.com/neurosamAI/tow-cli/issues). We take bug reports seriously.
 
