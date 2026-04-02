@@ -57,6 +57,9 @@ Add to your MCP settings:
 | `tow_list_deployments` | List deployment history |
 | `tow_list_modules` | List configured modules |
 | `tow_list_environments` | List configured environments |
+| `tow_ssh` | Execute ad-hoc commands on remote servers |
+| `tow_doctor` | Run pre-flight diagnostics |
+| `tow_metrics` | Show deployment metrics from audit log |
 
 ## Security
 

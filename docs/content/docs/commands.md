@@ -170,6 +170,17 @@ tow logs --delete-preset error-logs                       # Remove a preset
 | `--list-presets` | | List all saved log presets |
 | `--delete-preset` | | Delete a saved log preset |
 
+#### Multi-Module Logs
+
+Stream logs from multiple modules simultaneously:
+
+```bash
+tow logs -e prod -m kafka,zookeeper --all -n 5    # multiple modules
+tow logs -e prod -m kafka,zookeeper --all -F      # stream multiple modules
+```
+
+Output is prefixed with `[module/server]` for each line.
+
 ### `tow ssh`
 
 Execute ad-hoc commands on remote servers over SSH without opening an interactive session.
@@ -277,6 +288,8 @@ Open an interactive SSH session to a server.
 tow login -e prod -m api-server -s 1
 ```
 
+> **Tip**: When multiple servers or modules match, Tow shows an interactive picker. Use `-s` to specify a server by name, or `-m` for a module. If only one is given, Tow lets you pick the other interactively.
+
 ### `tow unlock`
 
 Force release a deploy lock.
@@ -369,6 +382,19 @@ tow plugin remove mssql
 35 plugins are bundled in the binary. Community plugins are installed to `~/.tow/plugins/`.
 
 See [plugins/README.md](https://github.com/neurosamAI/tow-cli/tree/main/plugins) for the full list and plugin authoring guide.
+
+### `tow metrics`
+
+Show deployment statistics from audit log.
+
+```bash
+tow metrics                           # last 30 days, all modules
+tow metrics -e prod                   # filter by environment
+tow metrics -m api-server             # filter by module
+tow metrics --days 7                  # last 7 days
+```
+
+Shows total deployments, breakdown by action (deploy/auto/rollback), by module (with bar chart), and by day of week.
 
 ---
 

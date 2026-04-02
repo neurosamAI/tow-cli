@@ -259,6 +259,7 @@ Local Machine                    Remote Server
 | `tow cleanup` | Remove old deployment directories |
 | `tow download` | Download files from remote servers |
 | `tow provision` | Provision a new server (timezone, JRE, tools) |
+| `tow metrics` | Show deployment statistics from audit log |
 | `tow doctor` | Pre-flight diagnostics |
 | `tow mcp-server` | Start MCP server for AI agent integration |
 

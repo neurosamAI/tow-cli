@@ -523,6 +523,42 @@ tow logs --list-presets
 tow logs --delete-preset oom-check
 ```
 
+## Multi-Module Log Viewing
+
+Monitor related services together:
+
+```bash
+tow logs -e prod -m noriter-kafka,noriter-zookeeper --all -n 3
+```
+
+```
+[noriter-kafka/kafka-1]      2026-03-30 14:35:49 GC Pause Young 765M→702M 17ms
+[noriter-kafka/kafka-2]      2026-03-30 14:35:55 GC Pause Young 340M→292M 18ms
+[noriter-zookeeper/zk-1]     2026-03-30 14:36:01 Session established
+```
+
+## Deployment Metrics
+
+```bash
+tow metrics -e prod --days 7
+```
+
+```
+Deployments (last 7 days):
+  Total:        7
+
+By action:
+  deploy        4
+  auto          2
+  rollback      1
+
+By module:
+  api-server    ████████████████████ 4
+  admin         █████ 1
+  kafka         █████ 1
+  market        █████ 1
+```
+
 ## Running Ad-Hoc Commands with `tow ssh`
 
 Execute commands across servers without opening interactive sessions:
