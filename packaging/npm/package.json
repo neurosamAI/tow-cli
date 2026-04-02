@@ -1,6 +1,6 @@
 {
   "name": "@neurosamai/tow",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Lightweight, agentless deployment orchestrator for bare-metal servers and VMs",
   "author": "Murry Jeong <oss@neurosam.ai> (https://github.com/comchangs)",
   "license": "MIT",

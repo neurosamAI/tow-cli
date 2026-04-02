@@ -2,7 +2,7 @@
   "name": "tow-cli",
   "displayName": "Tow CLI",
   "description": "Deploy to bare-metal servers and VMs — without the complexity of Kubernetes",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "publisher": "neurosamai",
   "author": {
     "name": "Murry Jeong (comchangs)",
