@@ -669,6 +669,71 @@ func (d *Deployer) LogsForServers(envName, moduleName string, servers []config.S
 	return d.logsMulti(env, servers, moduleName, filter, lines, follow)
 }
 
+// LogsMultiModule streams logs from multiple modules across their servers
+func (d *Deployer) LogsMultiModule(envName string, servers []config.Server, moduleNames []string, filter string, lines int, follow bool) error {
+	env, ok := d.cfg.Environments[envName]
+	if !ok {
+		return fmt.Errorf("environment %q not found", envName)
+	}
+
+	colorReset := "\033[0m"
+
+	if !follow {
+		for i, srv := range servers {
+			modName := moduleNames[i]
+			logPath := d.resolveLogPath(env, srv, modName)
+			color := serverLogColors[i%len(serverLogColors)]
+			prefix := fmt.Sprintf("%s[%s/%s]%s ", color, modName, srv.ID(), colorReset)
+
+			tailCmd := fmt.Sprintf("tail -n %d %s", lines, logPath)
+			if filter != "" {
+				tailCmd += fmt.Sprintf(" | grep '%s'", filter)
+			}
+
+			result, err := d.ssh.Exec(env, srv.Host, tailCmd)
+			if err != nil {
+				logger.Warn("[%s/%s] failed to read logs: %v", modName, srv.ID(), err)
+				continue
+			}
+
+			for _, line := range strings.Split(strings.TrimRight(result.Stdout, "\n"), "\n") {
+				if line != "" {
+					fmt.Printf("%s%s\n", prefix, line)
+				}
+			}
+		}
+		return nil
+	}
+
+	// Follow mode
+	logger.Info("Streaming logs from %d module/server pairs. Press Ctrl+C to stop.\n", len(servers))
+
+	var wg sync.WaitGroup
+	for i, srv := range servers {
+		wg.Add(1)
+		go func(idx int, s config.Server, modName string) {
+			defer wg.Done()
+
+			logPath := d.resolveLogPath(env, s, modName)
+			color := serverLogColors[idx%len(serverLogColors)]
+			prefix := fmt.Sprintf("%s[%s/%s]%s ", color, modName, s.ID(), colorReset)
+
+			tailCmd := fmt.Sprintf("tail -n %d -f %s", lines, logPath)
+			if filter != "" {
+				tailCmd += fmt.Sprintf(" | grep --line-buffered '%s'", filter)
+			}
+
+			pw := &prefixWriter{prefix: prefix, out: os.Stdout}
+			if err := d.ssh.ExecStream(env, s.Host, tailCmd, pw, pw); err != nil {
+				logger.Warn("[%s/%s] log stream ended: %v", modName, s.ID(), err)
+			}
+		}(i, srv, moduleNames[i])
+	}
+
+	wg.Wait()
+	return nil
+}
+
 // logsSingle handles log reading/streaming for a single server
 func (d *Deployer) logsSingle(env *config.Environment, srv config.Server, moduleName, filter string, lines int, follow bool) error {
 	logPath := d.resolveLogPath(env, srv, moduleName)

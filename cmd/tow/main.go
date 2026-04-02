@@ -836,6 +836,32 @@ Examples:
 
 			deployer := deploy.New(cfg, sshMgr)
 
+			// Multi-module support: -m kafka,zookeeper
+			if strings.Contains(modName, ",") {
+				moduleNames := strings.Split(modName, ",")
+				var allTargetServers []config.Server
+				var serverModuleMap []string // parallel array: module name per server
+
+				for _, mn := range moduleNames {
+					mn = strings.TrimSpace(mn)
+					servers, _, err := cfg.GetServersForModule(envName, mn, 0)
+					if err != nil {
+						logger.Warn("Module %s: %v", mn, err)
+						continue
+					}
+					for _, srv := range servers {
+						allTargetServers = append(allTargetServers, srv)
+						serverModuleMap = append(serverModuleMap, mn)
+					}
+				}
+
+				if len(allTargetServers) == 0 {
+					return fmt.Errorf("no servers found for modules: %s", modName)
+				}
+
+				return deployer.LogsMultiModule(envName, allTargetServers, serverModuleMap, filter, lines, follow)
+			}
+
 			var logsErr error
 			if allServers {
 				logsErr = deployer.Logs(envName, modName, 0, filter, lines, follow)
