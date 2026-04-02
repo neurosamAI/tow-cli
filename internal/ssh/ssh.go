@@ -395,16 +395,7 @@ func (m *Manager) Download(env *config.Environment, host, remotePath, localDir s
 	return cmd.Run()
 }
 
-// sshCommandOpts returns SSH options for external commands (rsync, ssh)
-func (m *Manager) sshCommandOpts(keyPath string, port int) string {
-	opts := fmt.Sprintf("ssh -i %s -p %d", keyPath, port)
-	if m.InsecureHostKey {
-		opts += " -o StrictHostKeyChecking=no"
-	}
-	return opts
-}
-
-// UploadDir transfers a local directory to a remote server
+// UploadDir transfers a local directory to a remote server via tar + SCP
 func (m *Manager) UploadDir(env *config.Environment, host, localDir, remoteDir string) error {
 	if m.DryRun {
 		logger.Info("[DRY-RUN] Would upload directory %s to %s:%s", localDir, host, remoteDir)
@@ -412,18 +403,50 @@ func (m *Manager) UploadDir(env *config.Environment, host, localDir, remoteDir s
 	}
 
 	expandedKey := expandPath(env.SSHKeyPath)
-	sshOpts := m.sshCommandOpts(expandedKey, env.SSHPort)
 
-	cmd := exec.Command("rsync", "-avz", "--progress",
-		"-e", sshOpts,
-		localDir+"/",
-		fmt.Sprintf("%s@%s:%s/", env.SSHUser, host, remoteDir),
-	)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	// Create temp tar.gz
+	tmpFile, err := os.CreateTemp("", "tow-upload-*.tar.gz")
+	if err != nil {
+		return fmt.Errorf("creating temp file: %w", err)
+	}
+	tmpPath := tmpFile.Name()
+	tmpFile.Close()
+	defer os.Remove(tmpPath)
 
-	logger.Debug("[%s] rsync %s → %s", host, localDir, remoteDir)
-	return cmd.Run()
+	// tar the directory
+	tarCmd := exec.Command("tar", "czf", tmpPath, "-C", localDir, ".")
+	if err := tarCmd.Run(); err != nil {
+		return fmt.Errorf("tar %s: %w", localDir, err)
+	}
+
+	// SCP to remote
+	remoteTmp := fmt.Sprintf("/tmp/tow-upload-%d.tar.gz", time.Now().UnixNano())
+	scpArgs := []string{"-i", expandedKey, "-P", fmt.Sprintf("%d", env.SSHPort)}
+	if m.InsecureHostKey {
+		scpArgs = append(scpArgs, "-o", "StrictHostKeyChecking=no")
+	}
+	scpArgs = append(scpArgs, tmpPath, fmt.Sprintf("%s@%s:%s", env.SSHUser, host, remoteTmp))
+
+	scpCmd := exec.Command("scp", scpArgs...)
+	if err := scpCmd.Run(); err != nil {
+		return fmt.Errorf("scp to %s: %w", host, err)
+	}
+
+	// Extract on remote
+	extractCmd := fmt.Sprintf("mkdir -p %s && tar xzf %s -C %s && rm -f %s", remoteDir, remoteTmp, remoteDir, remoteTmp)
+	sshArgs := []string{"-i", expandedKey, "-p", fmt.Sprintf("%d", env.SSHPort)}
+	if m.InsecureHostKey {
+		sshArgs = append(sshArgs, "-o", "StrictHostKeyChecking=no")
+	}
+	sshArgs = append(sshArgs, fmt.Sprintf("%s@%s", env.SSHUser, host), extractCmd)
+
+	sshCmd := exec.Command("ssh", sshArgs...)
+	if err := sshCmd.Run(); err != nil {
+		return fmt.Errorf("extract on %s: %w", host, err)
+	}
+
+	logger.Debug("[%s] uploaded dir %s → %s", host, localDir, remoteDir)
+	return nil
 }
 
 // InteractiveLogin opens an interactive SSH session

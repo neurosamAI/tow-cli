@@ -219,32 +219,6 @@ func TestExpandPathTableDriven(t *testing.T) {
 	}
 }
 
-// --- sshCommandOpts tests ---
-
-func TestSSHCommandOpts(t *testing.T) {
-	m := NewManager(false)
-	opts := m.sshCommandOpts("/path/to/key", 22)
-	if opts != "ssh -i /path/to/key -p 22" {
-		t.Errorf("unexpected opts: %q", opts)
-	}
-}
-
-func TestSSHCommandOptsInsecure(t *testing.T) {
-	m := NewManager(true)
-	opts := m.sshCommandOpts("/path/to/key", 2222)
-	if opts != "ssh -i /path/to/key -p 2222 -o StrictHostKeyChecking=no" {
-		t.Errorf("unexpected opts: %q", opts)
-	}
-}
-
-func TestSSHCommandOptsCustomPort(t *testing.T) {
-	m := NewManager(false)
-	opts := m.sshCommandOpts("~/.ssh/id_rsa", 9922)
-	if opts != "ssh -i ~/.ssh/id_rsa -p 9922" {
-		t.Errorf("unexpected opts: %q", opts)
-	}
-}
-
 // --- resolveAuth tests ---
 
 func TestResolveAuthDefaults(t *testing.T) {
