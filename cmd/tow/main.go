@@ -1946,7 +1946,6 @@ Examples:
 				env    string
 				module string
 				action string
-				detail string
 			}
 
 			cutoff := time.Now().AddDate(0, 0, -days)

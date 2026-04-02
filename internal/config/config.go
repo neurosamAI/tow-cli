@@ -542,27 +542,3 @@ func (c *Config) Summary() (envCount, moduleCount, serverCount int) {
 	}
 	return
 }
-
-// findUnsetEnvVars scans text for ${VAR} patterns and returns names of unset variables
-func findUnsetEnvVars(text string) []string {
-	var unset []string
-	seen := map[string]bool{}
-
-	for i := 0; i < len(text)-1; i++ {
-		if text[i] == '$' && text[i+1] == '{' {
-			end := strings.Index(text[i:], "}")
-			if end < 0 {
-				continue
-			}
-			varName := text[i+2 : i+end]
-			if varName == "" || seen[varName] {
-				continue
-			}
-			seen[varName] = true
-			if os.Getenv(varName) == "" {
-				unset = append(unset, varName)
-			}
-		}
-	}
-	return unset
-}
