@@ -115,34 +115,125 @@ func loadContext(cmd *cobra.Command) (*config.Config, *ssh.Manager, error) {
 }
 
 // resolveTargets resolves environment, module, and server from flags.
-// Returns serverName (string) and serverNum (int) — name takes priority.
+// When interactive is true, missing -m or -s flags trigger interactive pickers
+// instead of returning an error.
 func resolveTargets(cmd *cobra.Command, cfg *config.Config) (string, string, int, error) {
-	env, _ := cmd.Flags().GetString("environment")
-	mod, _ := cmd.Flags().GetString("module")
+	return resolveTargetsWithMode(cmd, cfg, false)
+}
+
+// resolveTargetsInteractive is like resolveTargets but shows pickers when flags are omitted.
+func resolveTargetsInteractive(cmd *cobra.Command, cfg *config.Config) (string, string, int, error) {
+	return resolveTargetsWithMode(cmd, cfg, true)
+}
+
+func resolveTargetsWithMode(cmd *cobra.Command, cfg *config.Config, interactive bool) (string, string, int, error) {
+	envName, _ := cmd.Flags().GetString("environment")
+	modName, _ := cmd.Flags().GetString("module")
 	serverFlag, _ := cmd.Flags().GetString("server")
 
-	if env == "" {
+	if envName == "" {
 		return "", "", 0, fmt.Errorf("environment (-e) is required")
 	}
-	if mod == "" {
-		return "", "", 0, fmt.Errorf("module (-m) is required")
+
+	envCfg, ok := cfg.Environments[envName]
+	if !ok {
+		return "", "", 0, fmt.Errorf("environment %q not found in config", envName)
 	}
 
-	if _, ok := cfg.Environments[env]; !ok {
-		return "", "", 0, fmt.Errorf("environment %q not found in config", env)
+	// Non-interactive: require both flags
+	if !interactive {
+		if modName == "" {
+			return "", "", 0, fmt.Errorf("module (-m) is required")
+		}
+
+		serverNum := 0
+		if serverFlag != "" {
+			if n, err := fmt.Sscanf(serverFlag, "%d", &serverNum); n == 0 || err != nil {
+				serverNum = -1 // signal to use name
+			}
+		}
+		return envName, modName, serverNum, nil
 	}
 
-	// Parse server flag: number or name
+	// Interactive: pick missing values
+
+	// Case 1: server given but not module -> pick module from server's list
+	if modName == "" && serverFlag != "" {
+		var targetSrv *config.Server
+		for i := range envCfg.Servers {
+			if envCfg.Servers[i].ID() == serverFlag {
+				targetSrv = &envCfg.Servers[i]
+				break
+			}
+		}
+		if targetSrv == nil {
+			return "", "", 0, fmt.Errorf("server %q not found in environment %q", serverFlag, envName)
+		}
+		if len(targetSrv.Modules) == 0 {
+			return "", "", 0, fmt.Errorf("server %q has no modules assigned", serverFlag)
+		}
+		picked, err := pickModule(targetSrv.Modules)
+		if err != nil {
+			return "", "", 0, err
+		}
+		return envName, picked, targetSrv.Number, nil
+	}
+
+	// Case 2: module given but not server -> pick server if multiple
+	if modName != "" && serverFlag == "" {
+		servers, _, err := cfg.GetServersForModule(envName, modName, 0)
+		if err != nil {
+			return "", "", 0, err
+		}
+		serverNum := 0
+		if len(servers) > 1 {
+			srv, err := pickServer(servers)
+			if err != nil {
+				return "", "", 0, err
+			}
+			serverNum = srv.Number
+		}
+		return envName, modName, serverNum, nil
+	}
+
+	// Case 3: neither module nor server -> pick module first, then server
+	if modName == "" && serverFlag == "" {
+		var moduleNames []string
+		for name := range cfg.Modules {
+			moduleNames = append(moduleNames, name)
+		}
+		if len(moduleNames) == 0 {
+			return "", "", 0, fmt.Errorf("no modules configured")
+		}
+		picked, err := pickModule(moduleNames)
+		if err != nil {
+			return "", "", 0, err
+		}
+		modName = picked
+
+		servers, _, err := cfg.GetServersForModule(envName, modName, 0)
+		if err != nil {
+			return "", "", 0, err
+		}
+		serverNum := 0
+		if len(servers) > 1 {
+			srv, err := pickServer(servers)
+			if err != nil {
+				return "", "", 0, err
+			}
+			serverNum = srv.Number
+		}
+		return envName, modName, serverNum, nil
+	}
+
+	// Case 4: both given -> parse server flag
 	serverNum := 0
 	if serverFlag != "" {
-		if n, err := fmt.Sscanf(serverFlag, "%d", &serverNum); n == 0 || err != nil {
-			// Not a number — treat as server name, store in serverNum=0
-			// The name will be resolved in resolveServerName
-			serverNum = -1 // signal to use name
+		if n, e := fmt.Sscanf(serverFlag, "%d", &serverNum); n == 0 || e != nil {
+			serverNum = -1
 		}
 	}
-
-	return env, mod, serverNum, nil
+	return envName, modName, serverNum, nil
 }
 
 // pickServer prompts the user to select a server when multiple match and no -s flag is given.
@@ -194,112 +285,6 @@ func pickModule(modules []string) (string, error) {
 	return modules[idx-1], nil
 }
 
-// resolveTargetsInteractive resolves environment, module, and server with interactive selection.
-// - env required
-// - if -m given but not -s: pick server (if multiple)
-// - if -s given but not -m: pick module (from server's module list)
-// - if neither -m nor -s: pick module first, then server
-func resolveTargetsInteractive(cmd *cobra.Command, cfg *config.Config) (envName, modName string, serverNum int, err error) {
-	envName, _ = cmd.Flags().GetString("environment")
-	modName, _ = cmd.Flags().GetString("module")
-	serverFlag, _ := cmd.Flags().GetString("server")
-
-	if envName == "" {
-		return "", "", 0, fmt.Errorf("environment (-e) is required")
-	}
-
-	envCfg, ok := cfg.Environments[envName]
-	if !ok {
-		return "", "", 0, fmt.Errorf("environment %q not found in config", envName)
-	}
-
-	// Case 1: server given but not module → pick module from server's list
-	if modName == "" && serverFlag != "" {
-		// Find the server
-		var targetSrv *config.Server
-		for i := range envCfg.Servers {
-			if envCfg.Servers[i].ID() == serverFlag {
-				targetSrv = &envCfg.Servers[i]
-				break
-			}
-		}
-		if targetSrv == nil {
-			return "", "", 0, fmt.Errorf("server %q not found in environment %q", serverFlag, envName)
-		}
-
-		if len(targetSrv.Modules) == 0 {
-			return "", "", 0, fmt.Errorf("server %q has no modules assigned", serverFlag)
-		}
-
-		modName, err = pickModule(targetSrv.Modules)
-		if err != nil {
-			return "", "", 0, err
-		}
-		serverNum = targetSrv.Number
-		return envName, modName, serverNum, nil
-	}
-
-	// Case 2: module given but not server → pick server (if multiple)
-	if modName != "" && serverFlag == "" {
-		servers, _, err := cfg.GetServersForModule(envName, modName, 0)
-		if err != nil {
-			return "", "", 0, err
-		}
-		if len(servers) > 1 {
-			srv, err := pickServer(servers)
-			if err != nil {
-				return "", "", 0, err
-			}
-			serverNum = srv.Number
-		}
-
-		// Parse serverFlag if present
-		if serverFlag != "" {
-			fmt.Sscanf(serverFlag, "%d", &serverNum)
-		}
-		return envName, modName, serverNum, nil
-	}
-
-	// Case 3: neither module nor server → pick module first
-	if modName == "" && serverFlag == "" {
-		var moduleNames []string
-		for name := range cfg.Modules {
-			moduleNames = append(moduleNames, name)
-		}
-		if len(moduleNames) == 0 {
-			return "", "", 0, fmt.Errorf("no modules configured")
-		}
-
-		modName, err = pickModule(moduleNames)
-		if err != nil {
-			return "", "", 0, err
-		}
-
-		// Then pick server
-		servers, _, err := cfg.GetServersForModule(envName, modName, 0)
-		if err != nil {
-			return "", "", 0, err
-		}
-		if len(servers) > 1 {
-			srv, err := pickServer(servers)
-			if err != nil {
-				return "", "", 0, err
-			}
-			serverNum = srv.Number
-		}
-		return envName, modName, serverNum, nil
-	}
-
-	// Case 4: both given → parse server flag
-	if serverFlag != "" {
-		if n, e := fmt.Sscanf(serverFlag, "%d", &serverNum); n == 0 || e != nil {
-			serverNum = -1
-		}
-	}
-
-	return envName, modName, serverNum, nil
-}
-
 // confirmProdDeploy asks for user confirmation when deploying to production-like environments
 func confirmProdDeploy(cmd *cobra.Command, envName, moduleName, command string) bool {
 	// Skip confirmation in dry-run mode
@@ -314,7 +299,7 @@ func confirmProdDeploy(cmd *cobra.Command, envName, moduleName, command string) 
 	}
 
 	fmt.Fprintf(os.Stderr, "\n%s⚠  WARNING: You are about to %s %s in %s%s\n",
-		"\033[33m", command, moduleName, strings.ToUpper(envName), "\033[0m")
+		logger.ColorYellow, command, moduleName, strings.ToUpper(envName), logger.ColorReset)
 	fmt.Fprintf(os.Stderr, "  Type 'yes' to confirm: ")
 
 	reader := bufio.NewReader(os.Stdin)

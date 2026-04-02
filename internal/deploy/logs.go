@@ -12,19 +12,8 @@ import (
 	"github.com/neurosamAI/tow-cli/internal/logger"
 )
 
-// serverLogColors assigns colors to server prefixes for multi-server log output
-var serverLogColors = []string{
-	"\033[36m", // cyan
-	"\033[33m", // yellow
-	"\033[32m", // green
-	"\033[35m", // magenta
-	"\033[34m", // blue
-	"\033[91m", // bright red
-	"\033[92m", // bright green
-	"\033[93m", // bright yellow
-	"\033[94m", // bright blue
-	"\033[95m", // bright magenta
-}
+// serverLogColors aliases logger.ServerColors for multi-server log output
+var serverLogColors = logger.ServerColors
 
 // resolveLogPath returns the log file path for a server, auto-detecting rotated files
 func (d *Deployer) resolveLogPath(env *config.Environment, srv config.Server, moduleName string) string {
@@ -94,7 +83,7 @@ func (d *Deployer) LogsMultiModule(envName string, servers []config.Server, modu
 		return fmt.Errorf("environment %q not found", envName)
 	}
 
-	colorReset := "\033[0m"
+	colorReset := logger.ColorReset
 
 	if !follow {
 		for i, srv := range servers {
@@ -181,7 +170,7 @@ func (d *Deployer) logsSingle(env *config.Environment, srv config.Server, module
 
 // logsMulti handles multiplexed log output from multiple servers
 func (d *Deployer) logsMulti(env *config.Environment, servers []config.Server, moduleName, filter string, lines int, follow bool) error {
-	colorReset := "\033[0m"
+	colorReset := logger.ColorReset
 
 	if !follow {
 		// Non-follow: read from each server sequentially with prefix

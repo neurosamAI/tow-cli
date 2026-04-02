@@ -349,8 +349,8 @@ Examples:
 			}
 
 			// Execute on each server with prefix
-			colorReset := "\033[0m"
-			colors := []string{"\033[36m", "\033[33m", "\033[32m", "\033[35m", "\033[34m"}
+			colorReset := logger.ColorReset
+			colors := logger.ServerColors
 
 			for i, srv := range servers {
 				result, err := sshMgr.Exec(env, srv.Host, remoteCmd)
@@ -517,10 +517,10 @@ func newDoctorCmd() *cobra.Command {
 
 			check := func(name string, fn func() error) {
 				if err := fn(); err != nil {
-					fmt.Printf("  \033[31m✗\033[0m %s — %v\n", name, err)
+					fmt.Printf("  %s✗%s %s — %v\n", logger.ColorRed, logger.ColorReset, name, err)
 					failed++
 				} else {
-					fmt.Printf("  \033[32m✓\033[0m %s\n", name)
+					fmt.Printf("  %s✓%s %s\n", logger.ColorGreen, logger.ColorReset, name)
 					passed++
 				}
 			}

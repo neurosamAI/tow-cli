@@ -18,16 +18,16 @@ const (
 
 var currentLevel = InfoLevel
 
-// Color codes
+// Unexported aliases for internal use (exported constants in colors.go)
 const (
-	colorReset  = "\033[0m"
-	colorRed    = "\033[31m"
-	colorGreen  = "\033[32m"
-	colorYellow = "\033[33m"
-	colorBlue   = "\033[34m"
-	colorCyan   = "\033[36m"
-	colorGray   = "\033[90m"
-	colorBold   = "\033[1m"
+	colorReset  = ColorReset
+	colorRed    = ColorRed
+	colorGreen  = ColorGreen
+	colorYellow = ColorYellow
+	colorBlue   = ColorBlue
+	colorCyan   = ColorCyan
+	colorGray   = ColorGray
+	colorBold   = ColorBold
 )
 
 func SetLevel(l Level) {
