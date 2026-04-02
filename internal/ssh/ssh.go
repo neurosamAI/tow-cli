@@ -46,6 +46,9 @@ func NewManager(insecureHostKey bool) *Manager {
 	}
 }
 
+// IsDryRun returns whether the manager is in dry-run mode
+func (m *Manager) IsDryRun() bool { return m.DryRun }
+
 // Close closes all open SSH connections
 func (m *Manager) Close() {
 	m.mu.Lock()

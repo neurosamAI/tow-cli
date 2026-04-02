@@ -15,14 +15,14 @@ import (
 // Deployer handles deployment operations for modules
 type Deployer struct {
 	cfg *config.Config
-	ssh *ssh.Manager
+	ssh ssh.Executor
 }
 
 // New creates a new Deployer
-func New(cfg *config.Config, sshMgr *ssh.Manager) *Deployer {
+func New(cfg *config.Config, sshExec ssh.Executor) *Deployer {
 	return &Deployer{
 		cfg: cfg,
-		ssh: sshMgr,
+		ssh: sshExec,
 	}
 }
 
@@ -117,7 +117,7 @@ func (d *Deployer) Upload(envName, moduleName string, serverNum int, filePath st
 	}
 
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		if d.ssh.DryRun {
+		if d.ssh.IsDryRun() {
 			logger.Info("[DRY-RUN] Artifact not found (skipping): %s", filePath)
 		} else {
 			return fmt.Errorf("artifact not found: %s", filePath)

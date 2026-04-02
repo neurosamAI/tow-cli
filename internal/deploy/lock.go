@@ -22,7 +22,7 @@ type LockInfo struct {
 }
 
 // AcquireLock creates a deploy lock on the target servers
-func AcquireLock(sshMgr *ssh.Manager, env *config.Environment, host, baseDir, command string) error {
+func AcquireLock(sshMgr ssh.Executor, env *config.Environment, host, baseDir, command string) error {
 	lockPath := fmt.Sprintf("%s/%s", baseDir, lockDir)
 
 	currentUser := "unknown"
@@ -65,7 +65,7 @@ fi
 }
 
 // ReleaseLock removes the deploy lock from the target servers
-func ReleaseLock(sshMgr *ssh.Manager, env *config.Environment, host, baseDir string) {
+func ReleaseLock(sshMgr ssh.Executor, env *config.Environment, host, baseDir string) {
 	lockPath := fmt.Sprintf("%s/%s", baseDir, lockDir)
 	unlockCmd := fmt.Sprintf(`rm -rf "%s" 2>/dev/null; echo "LOCK_RELEASED"`, lockPath)
 
