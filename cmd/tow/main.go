@@ -157,6 +157,31 @@ func resolveTargets(cmd *cobra.Command, cfg *config.Config) (string, string, int
 	return env, mod, serverNum, nil
 }
 
+// pickServer prompts the user to select a server when multiple match and no -s flag is given.
+// Returns the selected server's name. If only one server, returns it directly.
+func pickServer(servers []config.Server) (config.Server, error) {
+	if len(servers) == 1 {
+		return servers[0], nil
+	}
+
+	fmt.Fprintf(os.Stderr, "\nMultiple servers found:\n")
+	for i, srv := range servers {
+		fmt.Fprintf(os.Stderr, "  [%d] %-20s (%s)\n", i+1, srv.ID(), srv.Host)
+	}
+	fmt.Fprintf(os.Stderr, "\nSelect server [1-%d]: ", len(servers))
+
+	reader := bufio.NewReader(os.Stdin)
+	input, _ := reader.ReadString('\n')
+	input = strings.TrimSpace(input)
+
+	var idx int
+	if _, err := fmt.Sscanf(input, "%d", &idx); err != nil || idx < 1 || idx > len(servers) {
+		return config.Server{}, fmt.Errorf("invalid selection: %s", input)
+	}
+
+	return servers[idx-1], nil
+}
+
 // confirmProdDeploy asks for user confirmation when deploying to production-like environments
 func confirmProdDeploy(cmd *cobra.Command, envName, moduleName, command string) bool {
 	// Skip confirmation in dry-run mode
@@ -1025,13 +1050,29 @@ func newLoginCmd() *cobra.Command {
 			}
 			insecure, _ := cmd.Flags().GetBool("insecure")
 
-			env, mod, server, err := resolveTargets(cmd, cfg)
+			envName, modName, serverNum, err := resolveTargets(cmd, cfg)
 			if err != nil {
 				return err
 			}
 
+			// If no server specified and multiple exist, let user pick
+			serverFlag, _ := cmd.Flags().GetString("server")
+			if serverFlag == "" {
+				servers, _, err := cfg.GetServersForModule(envName, modName, 0)
+				if err != nil {
+					return err
+				}
+				if len(servers) > 1 {
+					srv, err := pickServer(servers)
+					if err != nil {
+						return err
+					}
+					serverNum = srv.Number
+				}
+			}
+
 			sshMgr := ssh.NewManager(insecure)
-			return sshMgr.InteractiveLogin(cfg, env, mod, server)
+			return sshMgr.InteractiveLogin(cfg, envName, modName, serverNum)
 		},
 	}
 }
@@ -1112,6 +1153,19 @@ Examples:
 			env, mod, server, err := resolveTargets(cmd, cfg)
 			if err != nil {
 				return err
+			}
+
+			// Interactive server selection if multiple match
+			serverFlag, _ := cmd.Flags().GetString("server")
+			if serverFlag == "" {
+				servers, _, err := cfg.GetServersForModule(env, mod, 0)
+				if err == nil && len(servers) > 1 {
+					srv, err := pickServer(servers)
+					if err != nil {
+						return err
+					}
+					server = srv.Number
+				}
 			}
 
 			localDir, _ := cmd.Flags().GetString("dir")
@@ -1642,6 +1696,18 @@ func newThreadDumpCmd() *cobra.Command {
 			env, mod, server, err := resolveTargets(cmd, cfg)
 			if err != nil {
 				return err
+			}
+
+			serverFlag, _ := cmd.Flags().GetString("server")
+			if serverFlag == "" {
+				servers, _, err := cfg.GetServersForModule(env, mod, 0)
+				if err == nil && len(servers) > 1 {
+					srv, err := pickServer(servers)
+					if err != nil {
+						return err
+					}
+					server = srv.Number
+				}
 			}
 
 			deployer := deploy.New(cfg, sshMgr)
