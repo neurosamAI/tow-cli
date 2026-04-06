@@ -175,9 +175,14 @@ cd %s
 rm -f current
 ln -s deploy/%s current
 
+# Create persistent log symlink: current/log → {baseDir}/log
+mkdir -p %s/log
+ln -sfn %s/log %s/current/log 2>/dev/null || true
+
 echo "DEPLOY_OK"
 `, deployDir, deployDir, baseDir, packageFile, baseDir, packageFile,
-			baseDir, ts)
+			baseDir, ts,
+			baseDir, baseDir, baseDir)
 
 		result, err := d.ssh.Exec(env, srv.Host, installCmd)
 		if err != nil {
@@ -198,6 +203,15 @@ user=%s
 TOWEOF
 `, baseDir, ts, gitCommit, gitBranch, gitMsg, os.Getenv("USER"))
 		d.ssh.Exec(env, srv.Host, deployInfoCmd)
+
+		// Create persistent data symlinks for data_dirs
+		if len(mod.DataDirs) > 0 {
+			for _, dir := range mod.DataDirs {
+				symlinkCmd := fmt.Sprintf("mkdir -p %s/%s && ln -sfn %s/%s %s/current/%s 2>/dev/null || true",
+					baseDir, dir, baseDir, dir, baseDir, dir)
+				d.ssh.Exec(env, srv.Host, symlinkCmd)
+			}
+		}
 
 		configPath := d.cfg.GetConfigPathByName(moduleName, envName, srv.Name, srv.Number)
 		if configPath != "" {
