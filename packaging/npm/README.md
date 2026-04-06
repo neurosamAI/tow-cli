@@ -74,7 +74,8 @@ $ tow doctor -e prod -m api-server
   ✓ Disk space — Available: 4.9G
   ✓ Branch policy
   ✓ No active deploy lock
-  9 passed, 0 failed
+  ✓ Server dependencies OK
+  10 passed, 0 failed
 ```
 
 </details>
@@ -183,7 +184,8 @@ These aren't theoretical features. They're battle scars turned into safeguards.
 - **Branch policies** — prevent deploying wrong branches to production
 - **Deploy locking** — prevent concurrent deployments
 - **Parallel execution** — deploy to multiple servers simultaneously
-- **Lifecycle hooks** — pre/post build, deploy, start, stop
+- **Lifecycle hooks** — pre/post build, deploy, start, stop + post_install
+- **Custom package layout** — remap source files to any directory structure in the package
 
 ## Installation
 
@@ -361,12 +363,13 @@ $ tow doctor -e prod -m api-server
   ✓ Disk space — Available: 4.9G
   ✓ Branch policy
   ✓ No active deploy lock
-  9 passed, 0 failed
+  ✓ Server dependencies OK
+  10 passed, 0 failed
 ```
 
 ## Current Status
 
-Tow is at **v0.3** — production-tested and actively developed.
+Tow is at **v0.4** — production-tested and actively developed.
 
 **Known limitations:**
 - No resume for interrupted large file uploads

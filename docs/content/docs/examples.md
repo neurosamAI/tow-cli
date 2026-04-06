@@ -237,6 +237,66 @@ modules:
       timeout: 30
 ```
 
+## Custom Package Layout
+
+Use `package_layout` to control exactly how files are arranged inside the deployment package. This is useful for legacy compatibility or non-standard project structures.
+
+### NSM Legacy Compatibility
+
+Migrate from a legacy shell-script deploy that expects `bin/`, `lib/`, `conf/` structure:
+
+```yaml
+modules:
+  nsm-api:
+    type: springboot
+    port: 8080
+    build_cmd: ./gradlew :nsm-api:bootJar
+    package_layout:
+      "script/nsm-api/":              "bin/"
+      "nsm-api/build/libs/*.jar":     "lib/"
+      "config/${ENV}/":               "conf/"
+      "config/logback-${ENV}.xml":    "conf/"
+    health_check:
+      type: http
+      target: http://localhost:8080/actuator/health
+```
+
+The resulting package looks like:
+
+```
+nsm-api.tar.gz
+├── bin/
+│   ├── env.sh
+│   └── server
+├── lib/
+│   └── nsm-api-1.2.3.jar
+└── conf/
+    ├── application.yml
+    └── logback-prod.xml
+```
+
+### Node.js with Custom Layout
+
+Package a Next.js standalone build with a clean directory structure:
+
+```yaml
+modules:
+  web-app:
+    type: node
+    port: 3000
+    build_cmd: npm ci && npm run build
+    package_layout:
+      ".next/standalone/":            "./"
+      ".next/static/":                ".next/static/"
+      "public/":                      "public/"
+    hooks:
+      post_install: |
+        cd current && npm rebuild --arch=x64 --platform=linux
+    health_check:
+      type: http
+      target: http://localhost:3000/api/health
+```
+
 ## Multi-Environment with Hierarchical Config
 
 For projects that need different configuration per environment and per server:

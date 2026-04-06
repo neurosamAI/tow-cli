@@ -268,7 +268,14 @@ Extract the uploaded package and update the `current` symlink.
 tow install -e prod -m api-server
 ```
 
-Creates a new timestamped directory in `deploy/` and updates the symlink.
+Creates a new timestamped directory in `deploy/`, updates the `current` symlink, and creates persistent symlinks:
+
+- `current/log` → `{baseDir}/log`
+- `current/{data_dir}` → `{baseDir}/{data_dir}` (for each entry in `data_dirs`)
+
+This ensures logs and data survive across deployments without manual configuration.
+
+After extract and symlink, the `post_install` hook runs if defined (e.g., create virtualenvs, run `pip install`, execute database migrations).
 
 ### `tow list`
 
@@ -400,7 +407,7 @@ Shows total deployments, breakdown by action (deploy/auto/rollback), by module (
 
 ### `tow doctor`
 
-Pre-flight diagnostics — checks config, SSH, remote directories, disk space, and deploy locks.
+Pre-flight diagnostics — checks config, SSH, remote directories, disk space, deploy locks, and server dependencies.
 
 ```bash
 tow doctor -e prod -m api-server --insecure
@@ -414,6 +421,30 @@ tow doctor -e prod -m api-server --insecure
   ✓ Disk space — Available: 15GB
   ✓ Branch policy
   ✓ No active deploy lock
+  ✓ Server dependencies OK
+```
+
+#### Server Dependency Checks
+
+`tow doctor` verifies that required tools are available on each remote server:
+
+| Tool | Status | Used by |
+|------|--------|---------|
+| `bash` | Required | All commands (server scripts) |
+| `tar` | Required | `install`, `deploy`, `auto` (package extraction) |
+| `lsof` | Required | `status`, `stop`, `doctor` (port/process checks) |
+| `curl` | Required | `health_check` (HTTP type), `provision` |
+| `nc` | Recommended | `health_check` (TCP type) |
+
+Missing required tools are reported as errors with install guidance:
+
+```
+  ✗ Missing required: lsof
+    → Install: sudo apt install lsof  (or: sudo yum install lsof)
+    → Affects: tow status, tow stop, tow doctor
+  ⚠ Missing recommended: nc
+    → Install: sudo apt install netcat-openbsd  (or: sudo yum install nmap-ncat)
+    → Affects: tow start (TCP health check)
 ```
 
 Run without `-m` to check environment-level connectivity.
@@ -517,6 +548,8 @@ Configure in Claude Desktop, Cursor, or any MCP-compatible client:
 | `rollback` | | | | ● | ● | ● | ● |
 | `upload` | | | ● | | | | |
 | `install` | | | | ● | | | |
+
+> **Note**: The `install` step runs the `post_install` hook after extraction and symlink creation. Use this for environment setup tasks like creating virtualenvs, running `pip install`, or executing database migrations.
 
 ## Dry-Run Mode
 

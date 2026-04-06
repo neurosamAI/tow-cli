@@ -11,7 +11,7 @@ class Tow < Formula
   desc "Lightweight, agentless deployment orchestrator for bare-metal servers and VMs"
   homepage "https://tow-cli.neurosam.ai"
   license "MIT"
-  version "0.3.1"
+  version "0.4.0"
 
   on_macos do
     if Hardware::CPU.arm?

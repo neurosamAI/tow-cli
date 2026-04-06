@@ -244,7 +244,7 @@ func (s *Server) Run() error {
 				"protocolVersion": "2024-11-05",
 				"serverInfo": map[string]string{
 					"name":    "tow-mcp-server",
-					"version": "0.3.1",
+					"version": "0.4.0",
 				},
 				"capabilities": map[string]interface{}{
 					"tools": map[string]bool{},

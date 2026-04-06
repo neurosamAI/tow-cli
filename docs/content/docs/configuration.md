@@ -180,6 +180,11 @@ modules:
       - bin/
       - conf/
 
+    package_layout:                    # Customizable package directory structure
+      "script/":               "bin/"
+      "build/libs/*.jar":      "lib/"
+      "config/${ENV}/":        "conf/"
+
     data_dirs:                         # Persistent directories (survive deploys)
       - data
       - cache
@@ -198,6 +203,9 @@ modules:
       post_build: echo "Build complete"
       pre_deploy: echo "Starting deploy"
       post_deploy: "curl -X POST https://hooks.slack.com/services/xxx"
+      post_install: |                  # Runs after extract + symlink (before stop/start)
+        cd current && python -m venv .venv
+        cd current && .venv/bin/pip install -r requirements.txt
       pre_start: ""
       post_start: ""
       pre_stop: ""
@@ -281,6 +289,44 @@ modules:
 ```
 
 All defaults can be overridden in `tow.yaml`. See [plugins/README.md](https://github.com/neurosamAI/tow-cli/tree/main/plugins) for full list and plugin authoring guide.
+
+## Package Layout
+
+The `package_layout` option lets you customize how files are arranged inside the deployment package. Each key is a source glob pattern (relative to the project root) and the value is the destination directory inside the package.
+
+```yaml
+modules:
+  api-server:
+    type: springboot
+    package_layout:
+      "script/":               "bin/"
+      "build/libs/*.jar":      "lib/"
+      "config/${ENV}/":        "conf/"
+```
+
+When `package_layout` is not set, Tow uses the default layout based on `package_includes`. When set, `package_layout` takes precedence and gives you full control over the mapping from source paths to package paths.
+
+- Source patterns support globs (`*`, `**`) and environment variable interpolation (`${ENV}`)
+- Trailing `/` on the source copies the directory contents; without it, the file is copied directly
+- Destination paths are always relative to the package root
+
+## Hooks
+
+Tow supports lifecycle hooks at various stages of the deployment pipeline:
+
+| Hook | When it runs | Execution |
+|------|-------------|-----------|
+| `pre_build` | Before build command | Local |
+| `post_build` | After build command | Local |
+| `pre_deploy` | Before deploy pipeline starts | Local |
+| `post_deploy` | After deploy pipeline completes | Local |
+| `post_install` | After extract + symlink, before stop/start | Remote (on each server) |
+| `pre_start` | Before start command | Remote |
+| `post_start` | After start command | Remote |
+| `pre_stop` | Before stop command | Remote |
+| `post_stop` | After stop command | Remote |
+
+The `post_install` hook is particularly useful for environment setup that must happen after new code is in place but before the service restarts. Common uses include creating Python virtualenvs, running `pip install`, and executing database migrations.
 
 ## Health Check Types
 
