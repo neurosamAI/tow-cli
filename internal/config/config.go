@@ -97,7 +97,8 @@ type Module struct {
 	SSH             *SSHConfig        `yaml:"ssh"`              // per-module SSH config (optional)
 	BuildCmd        string            `yaml:"build_cmd"`        // build command (e.g., "./gradlew :module:bootJar")
 	ArtifactPath    string            `yaml:"artifact_path"`    // path to build artifact
-	PackageIncludes []string          `yaml:"package_includes"` // additional files/dirs to package
+	PackageIncludes []string          `yaml:"package_includes"` // additional files/dirs to package (flat structure)
+	PackageLayout   map[string]string `yaml:"package_layout"`   // source → dest path mapping (structured package)
 	HealthCheck     HealthCheckConfig `yaml:"health_check"`
 	StartCmd        string            `yaml:"start_cmd"`  // remote start command
 	StopCmd         string            `yaml:"stop_cmd"`   // remote stop command

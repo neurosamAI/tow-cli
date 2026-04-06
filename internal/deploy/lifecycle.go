@@ -32,7 +32,7 @@ func (d *Deployer) Start(envName, moduleName string, serverNum int) error {
 		}
 
 		// Pass server host as argument (legacy compat: bin/server start {IP})
-		cmd := fmt.Sprintf("cd %s/current && %s %s", baseDir, startCmd, srv.Host)
+		cmd := fmt.Sprintf("cd %s/current && %s", baseDir, startCmd)
 		result, err := d.ssh.Exec(env, srv.Host, cmd)
 		if err != nil {
 			return fmt.Errorf("start failed: %w", err)
@@ -81,7 +81,7 @@ func (d *Deployer) StartRolling(envName, moduleName string, serverNum int) error
 			d.execHook(env, srv.Host, "pre_start", mod.Hooks.PreStart)
 		}
 
-		cmd := fmt.Sprintf("cd %s/current && %s %s", baseDir, startCmd, srv.Host)
+		cmd := fmt.Sprintf("cd %s/current && %s", baseDir, startCmd)
 		result, err := d.ssh.Exec(env, srv.Host, cmd)
 		if err != nil {
 			return fmt.Errorf("[%s] start failed: %w", srv.Host, err)

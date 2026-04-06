@@ -2,7 +2,9 @@ package pipeline
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/neurosamAI/tow-cli/internal/config"
@@ -234,9 +236,14 @@ func (p *Pipeline) Package(moduleName, envName string) error {
 		artifactPath = fmt.Sprintf("build/%s.tar.gz", moduleName)
 	}
 
+	// If package_layout is defined, use structured packaging
+	if len(mod.PackageLayout) > 0 {
+		return p.packageWithLayout(moduleName, envName, mod, artifactPath)
+	}
+
+	// Otherwise, use flat packaging (original behavior)
 	var includes []string
 
-	// Get handler-specific package contents
 	handler, err := module.Get(mod.Type)
 	if err == nil {
 		includes = append(includes, handler.PackageContents(moduleName, "")...)
@@ -264,6 +271,51 @@ func (p *Pipeline) Package(moduleName, envName string) error {
 	}
 
 	logger.Success("Package created: %s", artifactPath)
+	return nil
+}
+
+// packageWithLayout creates a structured tar.gz with remapped paths.
+// Example layout:
+//
+//	package_layout:
+//	  "script/":               "bin/"
+//	  "build/libs/*.jar":      "lib/"
+//	  "config/${ENV}/":        "conf/"
+func (p *Pipeline) packageWithLayout(moduleName, envName string, mod *config.Module, artifactPath string) error {
+	// Create temp staging directory
+	tmpDir, err := os.MkdirTemp("", "tow-package-*")
+	if err != nil {
+		return fmt.Errorf("creating temp dir: %w", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	for src, dst := range mod.PackageLayout {
+		// Substitute ${ENV} and ${MODULE} in source paths
+		src = substituteVars(src, envName, moduleName, mod.Variables)
+		dst = substituteVars(dst, envName, moduleName, mod.Variables)
+
+		destDir := filepath.Join(tmpDir, dst)
+		os.MkdirAll(destDir, 0755)
+
+		// Use shell glob expansion for source
+		cpCmd := fmt.Sprintf("cp -r %s %s/ 2>/dev/null || true", src, destDir)
+		logger.Debug("Layout: %s → %s", src, dst)
+
+		if err := runLocalCmd(cpCmd); err != nil {
+			logger.Warn("Layout copy failed for %s: %v", src, err)
+		}
+	}
+
+	// Ensure artifact parent dir exists
+	os.MkdirAll(filepath.Dir(artifactPath), 0755)
+
+	// Create tar.gz from staging directory
+	tarCmd := fmt.Sprintf("tar czf %s -C %s .", artifactPath, tmpDir)
+	if err := runLocalCmd(tarCmd); err != nil {
+		return fmt.Errorf("packaging failed: %w", err)
+	}
+
+	logger.Success("Package created: %s (structured layout)", artifactPath)
 	return nil
 }
 
