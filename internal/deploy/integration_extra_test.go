@@ -613,3 +613,710 @@ func TestPrefixWriter(t *testing.T) {
 		t.Errorf("expected prefixed line two, got: %s", content)
 	}
 }
+
+// multiServerConfig returns a config with 2 servers for multi-server tests
+func multiServerConfig() *config.Config {
+	return &config.Config{
+		Project: config.ProjectConfig{
+			Name:    "test-project",
+			BaseDir: "/app",
+		},
+		Environments: map[string]*config.Environment{
+			"dev": {
+				SSHUser:    "testuser",
+				SSHPort:    22,
+				SSHKeyPath: "~/.ssh/test.pem",
+				Servers: []config.Server{
+					{Number: 1, Host: "10.0.1.10"},
+					{Number: 2, Host: "10.0.1.11"},
+				},
+			},
+		},
+		Modules: map[string]*config.Module{
+			"api-server": {
+				Type:         "springboot",
+				Port:         8080,
+				ArtifactPath: "build/api-server.tar.gz",
+				StartCmd:     "./bin/start.sh",
+				StopCmd:      "./bin/stop.sh",
+				HealthCheck: config.HealthCheckConfig{
+					Type:     "tcp",
+					Target:   ":8080",
+					Timeout:  2,
+					Interval: 1,
+					Retries:  1,
+				},
+			},
+		},
+		Retention: config.RetentionConfig{
+			Keep:        5,
+			AutoCleanup: true,
+		},
+	}
+}
+
+func TestStartRolling(t *testing.T) {
+	cfg := multiServerConfig()
+	mock := &ssh.MockExecutor{}
+
+	var startOrder []string
+	mock.ExecFn = func(env *config.Environment, host, command string) (*ssh.ExecResult, error) {
+		if strings.Contains(command, "start.sh") {
+			startOrder = append(startOrder, host)
+		}
+		// Health check returns HEALTHY
+		if strings.Contains(command, "nc -z") {
+			return &ssh.ExecResult{Host: host, Stdout: "HEALTHY\n"}, nil
+		}
+		return &ssh.ExecResult{Host: host, Stdout: "OK\n"}, nil
+	}
+	d := New(cfg, mock)
+
+	err := d.StartRolling("dev", "api-server", 0)
+	if err != nil {
+		t.Fatalf("StartRolling failed: %v", err)
+	}
+
+	// Verify sequential start: both servers started
+	if len(startOrder) != 2 {
+		t.Fatalf("expected 2 servers started sequentially, got %d", len(startOrder))
+	}
+	if startOrder[0] != "10.0.1.10" || startOrder[1] != "10.0.1.11" {
+		t.Errorf("expected start order [10.0.1.10, 10.0.1.11], got %v", startOrder)
+	}
+
+	// Verify health checks were performed (at least one nc -z per server)
+	cmds := mock.GetCommands()
+	healthChecks := 0
+	for _, cmd := range cmds {
+		if strings.Contains(cmd, "nc -z") {
+			healthChecks++
+		}
+	}
+	if healthChecks < 2 {
+		t.Errorf("expected at least 2 health checks (one per server), got %d", healthChecks)
+	}
+}
+
+func TestStartRollingHealthFailAborts(t *testing.T) {
+	cfg := multiServerConfig()
+	mock := &ssh.MockExecutor{}
+
+	mock.ExecFn = func(env *config.Environment, host, command string) (*ssh.ExecResult, error) {
+		// Health check always fails — return FAILED (not UNHEALTHY, which contains "HEALTHY")
+		if strings.Contains(command, "nc -z") {
+			return &ssh.ExecResult{Host: host, Stdout: "FAILED\n"}, nil
+		}
+		return &ssh.ExecResult{Host: host, Stdout: "OK\n"}, nil
+	}
+	d := New(cfg, mock)
+
+	err := d.StartRolling("dev", "api-server", 0)
+	if err == nil {
+		t.Fatal("expected error when health check fails during rolling start")
+	}
+	if !strings.Contains(err.Error(), "health check failed") {
+		t.Errorf("expected health check failure error, got: %v", err)
+	}
+}
+
+func TestLogsForServers(t *testing.T) {
+	cfg := multiServerConfig()
+	mock := &ssh.MockExecutor{}
+
+	mock.ExecFn = func(env *config.Environment, host, command string) (*ssh.ExecResult, error) {
+		if strings.Contains(command, "tail") {
+			return &ssh.ExecResult{
+				Host:   host,
+				Stdout: "log from " + host + "\n",
+			}, nil
+		}
+		// resolveLogPath detection
+		return &ssh.ExecResult{Host: host, Stdout: "/app/api-server/log/std.log\n"}, nil
+	}
+	d := New(cfg, mock)
+
+	servers := cfg.Environments["dev"].Servers
+	err := d.LogsForServers("dev", "api-server", servers, "", 50, false)
+	if err != nil {
+		t.Fatalf("LogsForServers failed: %v", err)
+	}
+
+	cmds := mock.GetCommands()
+	tailCount := 0
+	for _, cmd := range cmds {
+		if strings.Contains(cmd, "tail") {
+			tailCount++
+		}
+	}
+	// Each server: 1 resolveLogPath + 1 tail = 2 tail-containing commands per server,
+	// but resolveLogPath uses "if [ -f" not "tail", so just count tail commands
+	if tailCount < 2 {
+		t.Errorf("expected at least 2 tail commands (one per server), got %d", tailCount)
+	}
+}
+
+func TestLogsForServersEnvNotFound(t *testing.T) {
+	cfg := integrationConfig()
+	mock := &ssh.MockExecutor{}
+	d := New(cfg, mock)
+
+	err := d.LogsForServers("nonexistent", "api-server", nil, "", 50, false)
+	if err == nil {
+		t.Fatal("expected error for nonexistent environment")
+	}
+	if !strings.Contains(err.Error(), "not found") {
+		t.Errorf("expected 'not found' error, got: %v", err)
+	}
+}
+
+func TestLogsSingleNonFollow(t *testing.T) {
+	cfg := integrationConfig()
+	mock := &ssh.MockExecutor{}
+	mock.ExecFn = func(env *config.Environment, host, command string) (*ssh.ExecResult, error) {
+		return &ssh.ExecResult{Host: host, Stdout: "single server log line 1\nsingle server log line 2\n"}, nil
+	}
+	d := New(cfg, mock)
+
+	// Single server, non-follow path
+	err := d.Logs("dev", "api-server", 1, "", 100, false)
+	if err != nil {
+		t.Fatalf("Logs single non-follow failed: %v", err)
+	}
+
+	cmds := mock.GetCommands()
+	foundTail := false
+	for _, cmd := range cmds {
+		if strings.Contains(cmd, "tail -n 100") {
+			foundTail = true
+			break
+		}
+	}
+	if !foundTail {
+		t.Errorf("expected 'tail -n 100' command, got: %s", strings.Join(cmds, "\n"))
+	}
+}
+
+func TestUploadCert(t *testing.T) {
+	cfg := integrationConfig()
+	mock := &ssh.MockExecutor{}
+	d := New(cfg, mock)
+
+	// Create a temp cert file
+	tmpDir := t.TempDir()
+	certPath := filepath.Join(tmpDir, "server.pem")
+	os.WriteFile(certPath, []byte("-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----\n"), 0644)
+
+	err := d.UploadCert("dev", "api-server", 0, certPath)
+	if err != nil {
+		t.Fatalf("UploadCert failed: %v", err)
+	}
+
+	// Verify mkdir was called for cert directory
+	cmds := mock.GetCommands()
+	foundMkdir := false
+	foundChmod := false
+	for _, cmd := range cmds {
+		if strings.Contains(cmd, "mkdir") && strings.Contains(cmd, "cert") {
+			foundMkdir = true
+		}
+		if strings.Contains(cmd, "chmod 600") {
+			foundChmod = true
+		}
+	}
+	if !foundMkdir {
+		t.Error("expected mkdir command for cert directory")
+	}
+	if !foundChmod {
+		t.Error("expected chmod 600 command for cert file")
+	}
+
+	// Verify upload was called
+	if len(mock.Uploads) == 0 {
+		t.Error("expected upload to be called for cert file")
+	}
+}
+
+func TestUploadCertFileNotFound(t *testing.T) {
+	cfg := integrationConfig()
+	mock := &ssh.MockExecutor{}
+	d := New(cfg, mock)
+
+	err := d.UploadCert("dev", "api-server", 0, "/nonexistent/cert.pem")
+	if err == nil {
+		t.Fatal("expected error for nonexistent cert file")
+	}
+	if !strings.Contains(err.Error(), "not found") {
+		t.Errorf("expected 'not found' error, got: %v", err)
+	}
+}
+
+func TestListDeploymentsJSONFormat(t *testing.T) {
+	cfg := integrationConfig()
+	mock := &ssh.MockExecutor{}
+	mock.ExecFn = func(env *config.Environment, host, command string) (*ssh.ExecResult, error) {
+		return &ssh.ExecResult{Host: host, Stdout: "20260401-120000:current\n20260331-100000:\n20260330-090000:\n"}, nil
+	}
+	d := New(cfg, mock)
+
+	jsonStr, err := d.ListDeploymentsJSON("dev", "api-server", 0)
+	if err != nil {
+		t.Fatalf("ListDeploymentsJSON failed: %v", err)
+	}
+
+	// Verify JSON structure
+	if !strings.Contains(jsonStr, `"timestamp"`) {
+		t.Errorf("expected 'timestamp' field in JSON, got: %s", jsonStr)
+	}
+	if !strings.Contains(jsonStr, `"current"`) {
+		t.Errorf("expected 'current' field in JSON, got: %s", jsonStr)
+	}
+	if !strings.Contains(jsonStr, `"20260401-120000"`) {
+		t.Errorf("expected timestamp value in JSON, got: %s", jsonStr)
+	}
+	if !strings.Contains(jsonStr, `true`) {
+		t.Errorf("expected 'true' for current deployment, got: %s", jsonStr)
+	}
+	if !strings.Contains(jsonStr, `false`) {
+		t.Errorf("expected 'false' for non-current deployment, got: %s", jsonStr)
+	}
+}
+
+func TestLogsMultiServerNonFollow(t *testing.T) {
+	cfg := multiServerConfig()
+	mock := &ssh.MockExecutor{}
+	mock.ExecFn = func(env *config.Environment, host, command string) (*ssh.ExecResult, error) {
+		if strings.Contains(command, "tail") {
+			return &ssh.ExecResult{Host: host, Stdout: "multi log from " + host + "\n"}, nil
+		}
+		return &ssh.ExecResult{Host: host, Stdout: "/app/api-server/log/std.log\n"}, nil
+	}
+	d := New(cfg, mock)
+
+	// 2 servers -> uses logsMulti path
+	err := d.Logs("dev", "api-server", 0, "", 50, false)
+	if err != nil {
+		t.Fatalf("Logs multi-server failed: %v", err)
+	}
+}
+
+func TestLogsMultiModule(t *testing.T) {
+	cfg := multiServerConfig()
+	// Add a second module
+	cfg.Modules["worker"] = &config.Module{
+		Type: "node",
+		Port: 3000,
+	}
+
+	mock := &ssh.MockExecutor{}
+	mock.ExecFn = func(env *config.Environment, host, command string) (*ssh.ExecResult, error) {
+		if strings.Contains(command, "tail") {
+			return &ssh.ExecResult{Host: host, Stdout: "module log from " + host + "\n"}, nil
+		}
+		return &ssh.ExecResult{Host: host, Stdout: "/app/api-server/log/std.log\n"}, nil
+	}
+	d := New(cfg, mock)
+
+	// 2 servers, 2 modules
+	servers := []config.Server{
+		{Number: 1, Host: "10.0.1.10"},
+		{Number: 2, Host: "10.0.1.11"},
+	}
+	moduleNames := []string{"api-server", "worker"}
+
+	err := d.LogsMultiModule("dev", servers, moduleNames, "", 50, false)
+	if err != nil {
+		t.Fatalf("LogsMultiModule failed: %v", err)
+	}
+
+	cmds := mock.GetCommands()
+	tailCount := 0
+	for _, cmd := range cmds {
+		if strings.Contains(cmd, "tail -n 50") {
+			tailCount++
+		}
+	}
+	if tailCount < 2 {
+		t.Errorf("expected at least 2 tail commands for multi-module logs, got %d", tailCount)
+	}
+}
+
+func TestLogsMultiModuleEnvNotFound(t *testing.T) {
+	cfg := integrationConfig()
+	mock := &ssh.MockExecutor{}
+	d := New(cfg, mock)
+
+	err := d.LogsMultiModule("nonexistent", nil, nil, "", 50, false)
+	if err == nil {
+		t.Fatal("expected error for nonexistent environment")
+	}
+}
+
+func TestHealthCheckLogType(t *testing.T) {
+	cfg := integrationConfig()
+	cfg.Modules["api-server"].HealthCheck = config.HealthCheckConfig{
+		Type:     "log",
+		Target:   "Started .* in .* seconds",
+		Timeout:  2,
+		Interval: 1,
+		Retries:  1,
+	}
+
+	mock := &ssh.MockExecutor{}
+	mock.ExecFn = func(env *config.Environment, host, command string) (*ssh.ExecResult, error) {
+		if strings.Contains(command, "grep") {
+			return &ssh.ExecResult{Host: host, Stdout: "HEALTHY\n"}, nil
+		}
+		return &ssh.ExecResult{Host: host, Stdout: "OK\n"}, nil
+	}
+	d := New(cfg, mock)
+
+	env := cfg.Environments["dev"]
+	err := d.waitForHealthy(env, "10.0.1.10", "api-server")
+	if err != nil {
+		t.Fatalf("expected log health check to pass: %v", err)
+	}
+}
+
+func TestHealthCheckCommandType(t *testing.T) {
+	cfg := integrationConfig()
+	cfg.Modules["api-server"].HealthCheck = config.HealthCheckConfig{
+		Type:     "command",
+		Target:   "curl -sf http://localhost:8080/ping",
+		Timeout:  2,
+		Interval: 1,
+		Retries:  1,
+	}
+
+	mock := &ssh.MockExecutor{}
+	mock.ExecFn = func(env *config.Environment, host, command string) (*ssh.ExecResult, error) {
+		if strings.Contains(command, "curl") {
+			return &ssh.ExecResult{Host: host, Stdout: "HEALTHY\n"}, nil
+		}
+		return &ssh.ExecResult{Host: host, Stdout: "OK\n"}, nil
+	}
+	d := New(cfg, mock)
+
+	env := cfg.Environments["dev"]
+	err := d.waitForHealthy(env, "10.0.1.10", "api-server")
+	if err != nil {
+		t.Fatalf("expected command health check to pass: %v", err)
+	}
+}
+
+func TestHealthCheckPortFallback(t *testing.T) {
+	cfg := integrationConfig()
+	// No explicit health check type but port is set - should auto-create TCP check
+	cfg.Modules["api-server"].HealthCheck = config.HealthCheckConfig{
+		Timeout:  2,
+		Interval: 1,
+		Retries:  1,
+	}
+	cfg.Modules["api-server"].Port = 9090
+
+	mock := &ssh.MockExecutor{}
+	mock.ExecFn = func(env *config.Environment, host, command string) (*ssh.ExecResult, error) {
+		if strings.Contains(command, "nc -z") && strings.Contains(command, "9090") {
+			return &ssh.ExecResult{Host: host, Stdout: "HEALTHY\n"}, nil
+		}
+		return &ssh.ExecResult{Host: host, Stdout: "OK\n"}, nil
+	}
+	d := New(cfg, mock)
+
+	env := cfg.Environments["dev"]
+	err := d.waitForHealthy(env, "10.0.1.10", "api-server")
+	if err != nil {
+		t.Fatalf("expected port-fallback health check to pass: %v", err)
+	}
+}
+
+func TestStopWithStillRunningProcess(t *testing.T) {
+	cfg := integrationConfig()
+	mock := &ssh.MockExecutor{}
+	mock.ExecFn = func(env *config.Environment, host, command string) (*ssh.ExecResult, error) {
+		if strings.Contains(command, "STILL_RUNNING") {
+			return &ssh.ExecResult{Host: host, Stdout: "STILL_RUNNING\n"}, nil
+		}
+		return &ssh.ExecResult{Host: host, Stdout: "OK\n"}, nil
+	}
+	d := New(cfg, mock)
+
+	err := d.Stop("dev", "api-server", 0)
+	if err != nil {
+		t.Fatalf("Stop failed: %v", err)
+	}
+
+	// Should have sent SIGKILL
+	cmds := mock.GetCommands()
+	foundKill := false
+	for _, cmd := range cmds {
+		if strings.Contains(cmd, "kill -9") {
+			foundKill = true
+			break
+		}
+	}
+	if !foundKill {
+		t.Error("expected kill -9 command for still running process")
+	}
+}
+
+func TestStartWithHooks(t *testing.T) {
+	cfg := integrationConfig()
+	mod := cfg.Modules["api-server"]
+	mod.Hooks = config.HooksConfig{
+		PreStart:  "echo pre-start",
+		PostStart: "echo post-start",
+	}
+
+	mock := &ssh.MockExecutor{}
+	mock.ExecFn = func(env *config.Environment, host, command string) (*ssh.ExecResult, error) {
+		if strings.Contains(command, "nc -z") {
+			return &ssh.ExecResult{Host: host, Stdout: "HEALTHY\n"}, nil
+		}
+		return &ssh.ExecResult{Host: host, Stdout: "OK\n"}, nil
+	}
+	d := New(cfg, mock)
+
+	err := d.Start("dev", "api-server", 0)
+	if err != nil {
+		t.Fatalf("Start with hooks failed: %v", err)
+	}
+
+	cmds := mock.GetCommands()
+	foundPre := false
+	foundPost := false
+	for _, cmd := range cmds {
+		if strings.Contains(cmd, "echo pre-start") {
+			foundPre = true
+		}
+		if strings.Contains(cmd, "echo post-start") {
+			foundPost = true
+		}
+	}
+	if !foundPre {
+		t.Error("expected pre_start hook to be executed")
+	}
+	if !foundPost {
+		t.Error("expected post_start hook to be executed")
+	}
+}
+
+func TestStopWithHooks(t *testing.T) {
+	cfg := integrationConfig()
+	mod := cfg.Modules["api-server"]
+	mod.Hooks = config.HooksConfig{
+		PreStop:  "echo pre-stop",
+		PostStop: "echo post-stop",
+	}
+
+	mock := &ssh.MockExecutor{}
+	mock.ExecFn = func(env *config.Environment, host, command string) (*ssh.ExecResult, error) {
+		if strings.Contains(command, "STOPPED") || strings.Contains(command, "STILL_RUNNING") {
+			return &ssh.ExecResult{Host: host, Stdout: "STOPPED\n"}, nil
+		}
+		return &ssh.ExecResult{Host: host, Stdout: "OK\n"}, nil
+	}
+	d := New(cfg, mock)
+
+	err := d.Stop("dev", "api-server", 0)
+	if err != nil {
+		t.Fatalf("Stop with hooks failed: %v", err)
+	}
+
+	cmds := mock.GetCommands()
+	foundPre := false
+	foundPost := false
+	for _, cmd := range cmds {
+		if strings.Contains(cmd, "echo pre-stop") {
+			foundPre = true
+		}
+		if strings.Contains(cmd, "echo post-stop") {
+			foundPost = true
+		}
+	}
+	if !foundPre {
+		t.Error("expected pre_stop hook to be executed")
+	}
+	if !foundPost {
+		t.Error("expected post_stop hook to be executed")
+	}
+}
+
+func TestInitWithDataDirs(t *testing.T) {
+	cfg := integrationConfig()
+	cfg.Modules["api-server"].DataDirs = []string{"data", "cache"}
+	mock := &ssh.MockExecutor{}
+	d := New(cfg, mock)
+
+	err := d.Init("dev", "api-server", 0)
+	if err != nil {
+		t.Fatalf("Init with data dirs failed: %v", err)
+	}
+
+	cmds := mock.GetCommands()
+	if len(cmds) == 0 {
+		t.Fatal("expected commands")
+	}
+	mkdirCmd := cmds[0]
+	if !strings.Contains(mkdirCmd, "data") {
+		t.Error("expected data dir in mkdir command")
+	}
+	if !strings.Contains(mkdirCmd, "cache") {
+		t.Error("expected cache dir in mkdir command")
+	}
+}
+
+func TestExecHookFailure(t *testing.T) {
+	cfg := integrationConfig()
+	mock := &ssh.MockExecutor{}
+	mock.ExecFn = func(env *config.Environment, host, command string) (*ssh.ExecResult, error) {
+		if strings.Contains(command, "failing-hook") {
+			return &ssh.ExecResult{Host: host, Stdout: "", ExitCode: 1, Stderr: "hook error"}, nil
+		}
+		return &ssh.ExecResult{Host: host, Stdout: "OK\n"}, nil
+	}
+	d := New(cfg, mock)
+
+	env := cfg.Environments["dev"]
+	// Should not panic with non-zero exit code
+	d.execHook(env, "10.0.1.10", "test_hook", "failing-hook")
+}
+
+func TestProvisionKafkaModule(t *testing.T) {
+	cfg := integrationConfig()
+	cfg.Modules["api-server"].Type = "kafka"
+	mock := &ssh.MockExecutor{}
+	mock.ExecFn = func(env *config.Environment, host, command string) (*ssh.ExecResult, error) {
+		return &ssh.ExecResult{Host: host, Stdout: "OK\n"}, nil
+	}
+	d := New(cfg, mock)
+
+	opts := ProvisionOptions{
+		InstallTools: true,
+	}
+	err := d.Provision("dev", "api-server", 0, opts)
+	if err != nil {
+		t.Fatalf("Provision kafka module failed: %v", err)
+	}
+
+	cmds := mock.GetCommands()
+	foundKafkaDir := false
+	for _, cmd := range cmds {
+		if strings.Contains(cmd, "kafka-logs") {
+			foundKafkaDir = true
+			break
+		}
+	}
+	if !foundKafkaDir {
+		t.Error("expected kafka-logs directory creation")
+	}
+}
+
+func TestProvisionRedisModule(t *testing.T) {
+	cfg := integrationConfig()
+	cfg.Modules["api-server"].Type = "redis"
+	mock := &ssh.MockExecutor{}
+	mock.ExecFn = func(env *config.Environment, host, command string) (*ssh.ExecResult, error) {
+		return &ssh.ExecResult{Host: host, Stdout: "OK\n"}, nil
+	}
+	d := New(cfg, mock)
+
+	opts := ProvisionOptions{}
+	err := d.Provision("dev", "api-server", 0, opts)
+	if err != nil {
+		t.Fatalf("Provision redis module failed: %v", err)
+	}
+
+	cmds := mock.GetCommands()
+	foundDataDir := false
+	for _, cmd := range cmds {
+		if strings.Contains(cmd, "mkdir") && strings.Contains(cmd, "data") {
+			foundDataDir = true
+			break
+		}
+	}
+	if !foundDataDir {
+		t.Error("expected data directory creation for redis")
+	}
+}
+
+func TestProvisionWithDataDirs(t *testing.T) {
+	cfg := integrationConfig()
+	cfg.Modules["api-server"].DataDirs = []string{"data", "cache"}
+	mock := &ssh.MockExecutor{}
+	mock.ExecFn = func(env *config.Environment, host, command string) (*ssh.ExecResult, error) {
+		return &ssh.ExecResult{Host: host, Stdout: "OK\n"}, nil
+	}
+	d := New(cfg, mock)
+
+	opts := ProvisionOptions{}
+	err := d.Provision("dev", "api-server", 0, opts)
+	if err != nil {
+		t.Fatalf("Provision with data dirs failed: %v", err)
+	}
+
+	cmds := mock.GetCommands()
+	foundDataDir := false
+	for _, cmd := range cmds {
+		if strings.Contains(cmd, "mkdir") && strings.Contains(cmd, "data") && strings.Contains(cmd, "cache") {
+			foundDataDir = true
+			break
+		}
+	}
+	if !foundDataDir {
+		t.Error("expected data dirs creation")
+	}
+}
+
+func TestStopNoPortModule(t *testing.T) {
+	cfg := integrationConfig()
+	cfg.Modules["api-server"].Port = 0
+	mock := &ssh.MockExecutor{}
+	mock.ExecFn = func(env *config.Environment, host, command string) (*ssh.ExecResult, error) {
+		return &ssh.ExecResult{Host: host, Stdout: "OK\n"}, nil
+	}
+	d := New(cfg, mock)
+
+	err := d.Stop("dev", "api-server", 0)
+	if err != nil {
+		t.Fatalf("Stop no-port module failed: %v", err)
+	}
+}
+
+func TestStartFailsWithExitCode(t *testing.T) {
+	cfg := integrationConfig()
+	mock := &ssh.MockExecutor{}
+	mock.ExecFn = func(env *config.Environment, host, command string) (*ssh.ExecResult, error) {
+		if strings.Contains(command, "start.sh") {
+			return &ssh.ExecResult{Host: host, ExitCode: 1, Stderr: "port already in use"}, nil
+		}
+		return &ssh.ExecResult{Host: host, Stdout: "OK\n"}, nil
+	}
+	d := New(cfg, mock)
+
+	err := d.Start("dev", "api-server", 0)
+	if err == nil {
+		t.Fatal("expected error when start returns non-zero exit code")
+	}
+	if !strings.Contains(err.Error(), "exit code") {
+		t.Errorf("expected exit code error, got: %v", err)
+	}
+}
+
+func TestStatusJSONNoPort(t *testing.T) {
+	cfg := integrationConfig()
+	cfg.Modules["api-server"].Port = 0
+	mock := &ssh.MockExecutor{}
+	mock.ExecFn = func(env *config.Environment, host, command string) (*ssh.ExecResult, error) {
+		return &ssh.ExecResult{Host: host, Stdout: "20260401-120000\n"}, nil
+	}
+	d := New(cfg, mock)
+
+	jsonStr, err := d.StatusJSON("dev", "api-server", 0)
+	if err != nil {
+		t.Fatalf("StatusJSON no port failed: %v", err)
+	}
+	if !strings.Contains(jsonStr, "unknown") {
+		t.Errorf("expected 'unknown' status for no-port module, got: %s", jsonStr)
+	}
+}

@@ -316,3 +316,214 @@ func TestGenerateConfigJavaGradleMultiModule(t *testing.T) {
 		t.Error("expected gradle multi-module command")
 	}
 }
+
+func TestGenerateScripts(t *testing.T) {
+	dir := t.TempDir()
+
+	det := &DetectedProject{
+		ProjectName:       "my-api",
+		RootDir:           dir,
+		DeployableModules: []string{"my-api"},
+		Types: []ProjectType{
+			{Name: "springboot", BuildTool: "gradle", Confidence: 95, Details: "Spring Boot with Gradle"},
+		},
+	}
+
+	err := GenerateScripts(det)
+	if err != nil {
+		t.Fatalf("GenerateScripts failed: %v", err)
+	}
+
+	// Verify script/env.sh was created
+	envPath := filepath.Join(dir, "script", "env.sh")
+	if _, err := os.Stat(envPath); os.IsNotExist(err) {
+		t.Error("expected script/env.sh to be created")
+	} else {
+		data, _ := os.ReadFile(envPath)
+		content := string(data)
+		if !strings.Contains(content, "MODULE_NAME") {
+			t.Error("expected MODULE_NAME in env.sh")
+		}
+		if !strings.Contains(content, "my-api") {
+			t.Error("expected module name 'my-api' in env.sh")
+		}
+		if !strings.Contains(content, "JAVA_OPTS") {
+			t.Error("expected JAVA_OPTS in springboot env.sh")
+		}
+	}
+
+	// Verify script/server was created
+	serverPath := filepath.Join(dir, "script", "server")
+	if _, err := os.Stat(serverPath); os.IsNotExist(err) {
+		t.Error("expected script/server to be created")
+	} else {
+		data, _ := os.ReadFile(serverPath)
+		content := string(data)
+		if !strings.Contains(content, "start()") {
+			t.Error("expected start() function in server script")
+		}
+		if !strings.Contains(content, "stop()") {
+			t.Error("expected stop() function in server script")
+		}
+		if !strings.Contains(content, "threaddump") {
+			t.Error("expected threaddump function for springboot type")
+		}
+	}
+}
+
+func TestGenerateScriptsMultiModule(t *testing.T) {
+	dir := t.TempDir()
+
+	det := &DetectedProject{
+		ProjectName:       "platform",
+		RootDir:           dir,
+		MultiModule:       true,
+		DeployableModules: []string{"api", "worker"},
+		Types: []ProjectType{
+			{Name: "node", BuildTool: "npm", Confidence: 85, Details: "Node.js"},
+		},
+	}
+
+	err := GenerateScripts(det)
+	if err != nil {
+		t.Fatalf("GenerateScripts multi-module failed: %v", err)
+	}
+
+	// Verify scripts created for each module in {module}/script/
+	for _, mod := range []string{"api", "worker"} {
+		envPath := filepath.Join(dir, mod, "script", "env.sh")
+		if _, err := os.Stat(envPath); os.IsNotExist(err) {
+			t.Errorf("expected %s/script/env.sh to be created", mod)
+		}
+		serverPath := filepath.Join(dir, mod, "script", "server")
+		if _, err := os.Stat(serverPath); os.IsNotExist(err) {
+			t.Errorf("expected %s/script/server to be created", mod)
+		}
+	}
+}
+
+func TestGenerateScriptsSkipsExisting(t *testing.T) {
+	dir := t.TempDir()
+
+	// Pre-create script/env.sh
+	scriptDir := filepath.Join(dir, "script")
+	os.MkdirAll(scriptDir, 0755)
+	os.WriteFile(filepath.Join(scriptDir, "env.sh"), []byte("existing-content"), 0755)
+
+	det := &DetectedProject{
+		ProjectName:       "my-api",
+		RootDir:           dir,
+		DeployableModules: []string{"my-api"},
+		Types: []ProjectType{
+			{Name: "go", Confidence: 90, Details: "Go"},
+		},
+	}
+
+	err := GenerateScripts(det)
+	if err != nil {
+		t.Fatalf("GenerateScripts failed: %v", err)
+	}
+
+	// Verify existing env.sh was NOT overwritten
+	data, _ := os.ReadFile(filepath.Join(scriptDir, "env.sh"))
+	if string(data) != "existing-content" {
+		t.Error("expected existing env.sh to be preserved")
+	}
+}
+
+func TestSetupAIIntegrations(t *testing.T) {
+	dir := t.TempDir()
+
+	setupAIIntegrations(dir)
+
+	// Verify .claude/skills/tow-deploy.md was created
+	skillPath := filepath.Join(dir, ".claude", "skills", "tow-deploy.md")
+	if _, err := os.Stat(skillPath); os.IsNotExist(err) {
+		t.Error("expected .claude/skills/tow-deploy.md to be created")
+	} else {
+		data, _ := os.ReadFile(skillPath)
+		content := string(data)
+		if !strings.Contains(content, "tow") {
+			t.Error("expected 'tow' in skill content")
+		}
+		if !strings.Contains(content, "deploy") {
+			t.Error("expected 'deploy' in skill content")
+		}
+	}
+
+	// Verify .claude/settings.json was created
+	settingsPath := filepath.Join(dir, ".claude", "settings.json")
+	if _, err := os.Stat(settingsPath); os.IsNotExist(err) {
+		t.Error("expected .claude/settings.json to be created")
+	} else {
+		data, _ := os.ReadFile(settingsPath)
+		content := string(data)
+		if !strings.Contains(content, "mcpServers") {
+			t.Error("expected 'mcpServers' in settings.json")
+		}
+		if !strings.Contains(content, "mcp-server") {
+			t.Error("expected 'mcp-server' in settings.json")
+		}
+	}
+}
+
+func TestSetupAIIntegrationsSkipsExisting(t *testing.T) {
+	dir := t.TempDir()
+
+	// Pre-create skill file
+	skillDir := filepath.Join(dir, ".claude", "skills")
+	os.MkdirAll(skillDir, 0755)
+	os.WriteFile(filepath.Join(skillDir, "tow-deploy.md"), []byte("custom skill"), 0644)
+
+	setupAIIntegrations(dir)
+
+	// Verify existing file was NOT overwritten
+	data, _ := os.ReadFile(filepath.Join(skillDir, "tow-deploy.md"))
+	if string(data) != "custom skill" {
+		t.Error("expected existing skill file to be preserved")
+	}
+}
+
+func TestGenerateScriptsAllTypes(t *testing.T) {
+	types := []struct {
+		name      string
+		buildTool string
+		expect    string
+	}{
+		{"springboot", "gradle", "JAVA_OPTS"},
+		{"java", "maven", "JAVA_OPTS"},
+		{"node", "npm", "NODE_ENV"},
+		{"python", "pip", "APP_PORT"},
+		{"go", "", "GOMAXPROCS"},
+		{"rust", "", "RUST_LOG"},
+		{"generic", "", "START_CMD"},
+	}
+
+	for _, tt := range types {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			det := &DetectedProject{
+				ProjectName:       "test-mod",
+				RootDir:           dir,
+				DeployableModules: []string{"test-mod"},
+				Types: []ProjectType{
+					{Name: tt.name, BuildTool: tt.buildTool, Confidence: 80, Details: tt.name},
+				},
+			}
+
+			err := GenerateScripts(det)
+			if err != nil {
+				t.Fatalf("GenerateScripts for %s failed: %v", tt.name, err)
+			}
+
+			envPath := filepath.Join(dir, "script", "env.sh")
+			data, err := os.ReadFile(envPath)
+			if err != nil {
+				t.Fatalf("reading env.sh: %v", err)
+			}
+			if !strings.Contains(string(data), tt.expect) {
+				t.Errorf("expected %q in env.sh for type %s", tt.expect, tt.name)
+			}
+		})
+	}
+}

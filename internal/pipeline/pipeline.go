@@ -39,6 +39,14 @@ func New(cfg *config.Config, sshMgr *ssh.Manager) *Pipeline {
 	}
 }
 
+// NewWithExecutor creates a Pipeline using a custom ssh.Executor (for testing)
+func NewWithExecutor(cfg *config.Config, exec ssh.Executor) *Pipeline {
+	return &Pipeline{
+		cfg:      cfg,
+		deployer: deploy.New(cfg, exec),
+	}
+}
+
 // Deploy executes: package → upload → install → stop → start
 func (p *Pipeline) Deploy(envName, moduleName string, serverNum int) error {
 	logger.Header("Deploy: %s → %s", moduleName, envName)

@@ -1,6 +1,9 @@
 package pipeline
 
 import (
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -434,5 +437,360 @@ func TestSubstituteVarsWithAllPlaceholders(t *testing.T) {
 	expected := "prod-api-production:8080"
 	if result != expected {
 		t.Errorf("expected %q, got %q", expected, result)
+	}
+}
+
+func TestDeployWithMockExecutor(t *testing.T) {
+	SetDryRun(true)
+	defer SetDryRun(false)
+
+	cfg := pipelineConfig()
+	cfg.Modules["api"].ArtifactPath = "build/api.tar.gz"
+	cfg.Retention.AutoCleanup = false
+
+	mock := &ssh.MockExecutor{DryRun: true}
+	mock.ExecFn = func(env *config.Environment, host, command string) (*ssh.ExecResult, error) {
+		if strings.Contains(command, "ln -s") {
+			return &ssh.ExecResult{Host: host, Stdout: "DEPLOY_OK\n"}, nil
+		}
+		if strings.Contains(command, "nc -z") {
+			return &ssh.ExecResult{Host: host, Stdout: "HEALTHY\n"}, nil
+		}
+		if strings.Contains(command, "STOPPED") || strings.Contains(command, "STILL_RUNNING") {
+			return &ssh.ExecResult{Host: host, Stdout: "STOPPED\n"}, nil
+		}
+		if strings.Contains(command, "CLEANUP_DONE") {
+			return &ssh.ExecResult{Host: host, Stdout: "CLEANUP_DONE removed=0\n"}, nil
+		}
+		return &ssh.ExecResult{Host: host, Stdout: "OK\n"}, nil
+	}
+
+	p := NewWithExecutor(cfg, mock)
+
+	err := p.Deploy("dev", "api", 0)
+	if err != nil {
+		t.Fatalf("Deploy failed: %v", err)
+	}
+
+	cmds := mock.GetCommands()
+	if len(cmds) == 0 {
+		t.Fatal("expected commands to be executed")
+	}
+}
+
+func TestDeployWithAutoCleanup(t *testing.T) {
+	SetDryRun(true)
+	defer SetDryRun(false)
+
+	cfg := pipelineConfig()
+	cfg.Retention.AutoCleanup = true
+	cfg.Retention.Keep = 3
+
+	mock := &ssh.MockExecutor{DryRun: true}
+	mock.ExecFn = func(env *config.Environment, host, command string) (*ssh.ExecResult, error) {
+		if strings.Contains(command, "ln -s") {
+			return &ssh.ExecResult{Host: host, Stdout: "DEPLOY_OK\n"}, nil
+		}
+		if strings.Contains(command, "nc -z") {
+			return &ssh.ExecResult{Host: host, Stdout: "HEALTHY\n"}, nil
+		}
+		if strings.Contains(command, "STOPPED") || strings.Contains(command, "STILL_RUNNING") {
+			return &ssh.ExecResult{Host: host, Stdout: "STOPPED\n"}, nil
+		}
+		if strings.Contains(command, "CLEANUP_DONE") {
+			return &ssh.ExecResult{Host: host, Stdout: "CLEANUP_DONE removed=1\n"}, nil
+		}
+		return &ssh.ExecResult{Host: host, Stdout: "OK\n"}, nil
+	}
+
+	p := NewWithExecutor(cfg, mock)
+
+	err := p.Deploy("dev", "api", 0)
+	if err != nil {
+		t.Fatalf("Deploy with auto cleanup failed: %v", err)
+	}
+
+	// Verify cleanup command was issued
+	cmds := mock.GetCommands()
+	foundCleanup := false
+	for _, cmd := range cmds {
+		if strings.Contains(cmd, "CLEANUP_DONE") {
+			foundCleanup = true
+			break
+		}
+	}
+	if !foundCleanup {
+		t.Error("expected cleanup command to be executed")
+	}
+}
+
+func TestAutoWithMockExecutor(t *testing.T) {
+	SetDryRun(true)
+	defer SetDryRun(false)
+
+	cfg := pipelineConfig()
+	cfg.Retention.AutoCleanup = false
+
+	mock := &ssh.MockExecutor{DryRun: true}
+	mock.ExecFn = func(env *config.Environment, host, command string) (*ssh.ExecResult, error) {
+		if strings.Contains(command, "ln -s") {
+			return &ssh.ExecResult{Host: host, Stdout: "DEPLOY_OK\n"}, nil
+		}
+		if strings.Contains(command, "nc -z") {
+			return &ssh.ExecResult{Host: host, Stdout: "HEALTHY\n"}, nil
+		}
+		if strings.Contains(command, "STOPPED") || strings.Contains(command, "STILL_RUNNING") {
+			return &ssh.ExecResult{Host: host, Stdout: "STOPPED\n"}, nil
+		}
+		return &ssh.ExecResult{Host: host, Stdout: "OK\n"}, nil
+	}
+
+	p := NewWithExecutor(cfg, mock)
+
+	err := p.Auto("dev", "api", 0)
+	if err != nil {
+		t.Fatalf("Auto failed: %v", err)
+	}
+}
+
+func TestAutoWithRollbackSuccess(t *testing.T) {
+	SetDryRun(true)
+	defer SetDryRun(false)
+
+	cfg := pipelineConfig()
+	cfg.Retention.AutoCleanup = false
+
+	mock := &ssh.MockExecutor{DryRun: true}
+	mock.ExecFn = func(env *config.Environment, host, command string) (*ssh.ExecResult, error) {
+		if strings.Contains(command, "ln -s") {
+			return &ssh.ExecResult{Host: host, Stdout: "DEPLOY_OK\n"}, nil
+		}
+		if strings.Contains(command, "nc -z") {
+			return &ssh.ExecResult{Host: host, Stdout: "HEALTHY\n"}, nil
+		}
+		if strings.Contains(command, "STOPPED") || strings.Contains(command, "STILL_RUNNING") {
+			return &ssh.ExecResult{Host: host, Stdout: "STOPPED\n"}, nil
+		}
+		return &ssh.ExecResult{Host: host, Stdout: "OK\n"}, nil
+	}
+
+	p := NewWithExecutor(cfg, mock)
+
+	err := p.AutoWithRollback("dev", "api", 0)
+	if err != nil {
+		t.Fatalf("AutoWithRollback failed: %v", err)
+	}
+}
+
+func TestAutoWithRollbackOnStartFailure(t *testing.T) {
+	SetDryRun(true)
+	defer SetDryRun(false)
+
+	cfg := pipelineConfig()
+	cfg.Retention.AutoCleanup = false
+
+	startAttempt := 0
+	mock := &ssh.MockExecutor{DryRun: true}
+	mock.ExecFn = func(env *config.Environment, host, command string) (*ssh.ExecResult, error) {
+		if strings.Contains(command, "ln -s") && strings.Contains(command, "DEPLOY_OK") {
+			return &ssh.ExecResult{Host: host, Stdout: "DEPLOY_OK\n"}, nil
+		}
+		// Rollback ln -s command
+		if strings.Contains(command, "ln -s") && strings.Contains(command, "ROLLBACK_OK") {
+			return &ssh.ExecResult{Host: host, Stdout: "ROLLBACK_OK from a to b\n"}, nil
+		}
+		if strings.Contains(command, "start.sh") {
+			startAttempt++
+			if startAttempt == 1 {
+				// First start (deploy) fails
+				return &ssh.ExecResult{Host: host, Stdout: "OK\n", ExitCode: 1, Stderr: "start failed"}, nil
+			}
+			return &ssh.ExecResult{Host: host, Stdout: "OK\n"}, nil
+		}
+		if strings.Contains(command, "nc -z") {
+			if startAttempt <= 1 {
+				return &ssh.ExecResult{Host: host, Stdout: "FAILED\n"}, nil
+			}
+			return &ssh.ExecResult{Host: host, Stdout: "HEALTHY\n"}, nil
+		}
+		if strings.Contains(command, "STOPPED") || strings.Contains(command, "STILL_RUNNING") {
+			return &ssh.ExecResult{Host: host, Stdout: "STOPPED\n"}, nil
+		}
+		return &ssh.ExecResult{Host: host, Stdout: "OK\n"}, nil
+	}
+
+	p := NewWithExecutor(cfg, mock)
+
+	err := p.AutoWithRollback("dev", "api", 0)
+	// Should fail but with rollback message
+	if err == nil {
+		t.Fatal("expected error from AutoWithRollback when start fails")
+	}
+	if !strings.Contains(err.Error(), "rolled back") {
+		t.Errorf("expected 'rolled back' in error, got: %v", err)
+	}
+}
+
+func TestDeployRolling(t *testing.T) {
+	SetDryRun(true)
+	defer SetDryRun(false)
+
+	cfg := pipelineConfig()
+	cfg.Retention.AutoCleanup = false
+
+	mock := &ssh.MockExecutor{DryRun: true}
+	mock.ExecFn = func(env *config.Environment, host, command string) (*ssh.ExecResult, error) {
+		if strings.Contains(command, "ln -s") {
+			return &ssh.ExecResult{Host: host, Stdout: "DEPLOY_OK\n"}, nil
+		}
+		if strings.Contains(command, "nc -z") {
+			return &ssh.ExecResult{Host: host, Stdout: "HEALTHY\n"}, nil
+		}
+		if strings.Contains(command, "STOPPED") || strings.Contains(command, "STILL_RUNNING") {
+			return &ssh.ExecResult{Host: host, Stdout: "STOPPED\n"}, nil
+		}
+		return &ssh.ExecResult{Host: host, Stdout: "OK\n"}, nil
+	}
+
+	p := NewWithExecutor(cfg, mock)
+	p.Rolling = true
+
+	err := p.Deploy("dev", "api", 0)
+	if err != nil {
+		t.Fatalf("Deploy with rolling failed: %v", err)
+	}
+}
+
+func TestPackageWithLayout(t *testing.T) {
+	SetDryRun(false) // actually run cp/tar
+
+	tmpDir := t.TempDir()
+
+	// Create source files
+	binDir := filepath.Join(tmpDir, "script")
+	os.MkdirAll(binDir, 0755)
+	os.WriteFile(filepath.Join(binDir, "start.sh"), []byte("#!/bin/bash\necho start"), 0755)
+	os.WriteFile(filepath.Join(binDir, "stop.sh"), []byte("#!/bin/bash\necho stop"), 0755)
+
+	libDir := filepath.Join(tmpDir, "build", "libs")
+	os.MkdirAll(libDir, 0755)
+	os.WriteFile(filepath.Join(libDir, "api.jar"), []byte("fake-jar-content"), 0644)
+
+	artifactPath := filepath.Join(tmpDir, "build", "api.tar.gz")
+
+	cfg := pipelineConfig()
+	cfg.Modules["api"].PackageLayout = map[string]string{
+		filepath.Join(tmpDir, "script") + "/":        "bin/",
+		filepath.Join(tmpDir, "build", "libs") + "/": "lib/",
+	}
+	cfg.Modules["api"].ArtifactPath = artifactPath
+
+	sshMgr := ssh.NewManager(false)
+	sshMgr.DryRun = true
+	p := New(cfg, sshMgr)
+
+	err := p.Package("api", "dev")
+	if err != nil {
+		t.Fatalf("Package with layout failed: %v", err)
+	}
+
+	// Verify artifact was created
+	if _, err := os.Stat(artifactPath); os.IsNotExist(err) {
+		t.Fatal("expected artifact file to be created")
+	}
+
+	// Verify tar contents by extracting
+	extractDir := filepath.Join(tmpDir, "extract")
+	os.MkdirAll(extractDir, 0755)
+	extractCmd := exec.Command("tar", "xzf", artifactPath, "-C", extractDir)
+	if err := extractCmd.Run(); err != nil {
+		t.Fatalf("extracting tar: %v", err)
+	}
+
+	// Check that bin/ and lib/ directories exist in the extracted archive
+	if _, err := os.Stat(filepath.Join(extractDir, "bin")); os.IsNotExist(err) {
+		t.Error("expected bin/ directory in tar archive")
+	}
+	if _, err := os.Stat(filepath.Join(extractDir, "lib")); os.IsNotExist(err) {
+		t.Error("expected lib/ directory in tar archive")
+	}
+}
+
+func TestPackageWithLayoutModuleSubstitution(t *testing.T) {
+	SetDryRun(false)
+
+	tmpDir := t.TempDir()
+
+	// Create source files using ${MODULE} substitution
+	modDir := filepath.Join(tmpDir, "api")
+	os.MkdirAll(filepath.Join(modDir, "build"), 0755)
+	os.WriteFile(filepath.Join(modDir, "build", "app.jar"), []byte("jar-content"), 0644)
+
+	artifactPath := filepath.Join(tmpDir, "build", "api.tar.gz")
+	os.MkdirAll(filepath.Join(tmpDir, "build"), 0755)
+
+	cfg := pipelineConfig()
+	cfg.Modules["api"].PackageLayout = map[string]string{
+		filepath.Join(tmpDir, "${MODULE}", "build") + "/": "lib/",
+	}
+	cfg.Modules["api"].ArtifactPath = artifactPath
+
+	sshMgr := ssh.NewManager(false)
+	sshMgr.DryRun = true
+	p := New(cfg, sshMgr)
+
+	err := p.Package("api", "dev")
+	if err != nil {
+		t.Fatalf("Package with layout module substitution failed: %v", err)
+	}
+
+	if _, err := os.Stat(artifactPath); os.IsNotExist(err) {
+		t.Fatal("expected artifact file to be created")
+	}
+}
+
+func TestPackageWithLayoutEnvSubstitution(t *testing.T) {
+	SetDryRun(false)
+
+	tmpDir := t.TempDir()
+
+	// Create config/dev/ directory
+	configDir := filepath.Join(tmpDir, "config", "dev")
+	os.MkdirAll(configDir, 0755)
+	os.WriteFile(filepath.Join(configDir, "app.yml"), []byte("server:\n  port: 8080"), 0644)
+
+	artifactPath := filepath.Join(tmpDir, "build", "api.tar.gz")
+	os.MkdirAll(filepath.Join(tmpDir, "build"), 0755)
+
+	cfg := pipelineConfig()
+	cfg.Modules["api"].PackageLayout = map[string]string{
+		filepath.Join(tmpDir, "config", "${ENV}") + "/": "conf/",
+	}
+	cfg.Modules["api"].ArtifactPath = artifactPath
+
+	sshMgr := ssh.NewManager(false)
+	sshMgr.DryRun = true
+	p := New(cfg, sshMgr)
+
+	err := p.Package("api", "dev")
+	if err != nil {
+		t.Fatalf("Package with layout env substitution failed: %v", err)
+	}
+
+	// Verify artifact was created
+	if _, err := os.Stat(artifactPath); os.IsNotExist(err) {
+		t.Fatal("expected artifact file to be created")
+	}
+
+	// Extract and verify conf/ directory
+	extractDir := filepath.Join(tmpDir, "extract")
+	os.MkdirAll(extractDir, 0755)
+	extractCmd := exec.Command("tar", "xzf", artifactPath, "-C", extractDir)
+	if err := extractCmd.Run(); err != nil {
+		t.Fatalf("extracting tar: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(extractDir, "conf")); os.IsNotExist(err) {
+		t.Error("expected conf/ directory in tar archive after ${ENV} substitution")
 	}
 }

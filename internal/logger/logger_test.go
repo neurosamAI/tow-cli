@@ -229,3 +229,73 @@ func TestWriterImplementsIOWriter(t *testing.T) {
 	_ = buf // just making sure Writer satisfies io.Writer interface
 	var _ interface{ Write([]byte) (int, error) } = w
 }
+
+func TestServerColor(t *testing.T) {
+	// Verify rotation: index 0 returns first color
+	c0 := ServerColor(0)
+	if c0 != ServerColors[0] {
+		t.Errorf("expected ServerColors[0]=%q, got %q", ServerColors[0], c0)
+	}
+
+	// Verify rotation wraps around
+	n := len(ServerColors)
+	cWrap := ServerColor(n)
+	if cWrap != ServerColors[0] {
+		t.Errorf("expected wrap to ServerColors[0]=%q, got %q", ServerColors[0], cWrap)
+	}
+
+	// Verify different indices give different colors (at least within palette size)
+	c1 := ServerColor(1)
+	if c0 == c1 {
+		t.Error("expected different colors for index 0 and 1")
+	}
+
+	// Verify high index wraps correctly
+	cHigh := ServerColor(123)
+	expected := ServerColors[123%n]
+	if cHigh != expected {
+		t.Errorf("expected ServerColors[%d]=%q, got %q", 123%n, expected, cHigh)
+	}
+}
+
+func TestColorPrefix(t *testing.T) {
+	prefix := ColorPrefix("server-1", 0)
+	if prefix == "" {
+		t.Error("expected non-empty prefix")
+	}
+
+	// Should contain the server name
+	if !bytes.Contains([]byte(prefix), []byte("server-1")) {
+		t.Errorf("expected prefix to contain 'server-1', got %q", prefix)
+	}
+
+	// Should contain brackets
+	if !bytes.Contains([]byte(prefix), []byte("[")) || !bytes.Contains([]byte(prefix), []byte("]")) {
+		t.Errorf("expected brackets in prefix, got %q", prefix)
+	}
+
+	// Should contain color reset code
+	if !bytes.Contains([]byte(prefix), []byte(ColorReset)) {
+		t.Errorf("expected color reset in prefix, got %q", prefix)
+	}
+
+	// Should end with space
+	if prefix[len(prefix)-1] != ' ' {
+		t.Errorf("expected prefix to end with space, got %q", prefix)
+	}
+
+	// Different indices should produce different prefixes (different colors)
+	prefix2 := ColorPrefix("server-1", 1)
+	if prefix == prefix2 {
+		t.Error("expected different prefixes for different indices")
+	}
+}
+
+func TestServerColorsLength(t *testing.T) {
+	if len(ServerColors) == 0 {
+		t.Fatal("ServerColors should not be empty")
+	}
+	if len(ServerColors) < 5 {
+		t.Errorf("expected at least 5 server colors, got %d", len(ServerColors))
+	}
+}

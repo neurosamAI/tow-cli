@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"gopkg.in/yaml.v3"
 )
 
 func TestPluginHandler(t *testing.T) {
@@ -161,5 +163,255 @@ func TestPluginDirs(t *testing.T) {
 	}
 	if dirs[0] != "plugins" {
 		t.Errorf("expected first dir to be 'plugins', got %s", dirs[0])
+	}
+}
+
+func TestVersionEntryUnmarshalYAMLString(t *testing.T) {
+	// Test simple URL string format
+	yamlStr := `"https://example.com/pkg-3.7.0.tar.gz"`
+	var v VersionEntry
+	if err := yaml.Unmarshal([]byte(yamlStr), &v); err != nil {
+		t.Fatalf("unmarshal string URL failed: %v", err)
+	}
+	if v.URL != "https://example.com/pkg-3.7.0.tar.gz" {
+		t.Errorf("expected URL string, got %q", v.URL)
+	}
+	if v.StartCmd != "" {
+		t.Errorf("expected empty StartCmd for string format, got %q", v.StartCmd)
+	}
+}
+
+func TestVersionEntryUnmarshalYAMLStruct(t *testing.T) {
+	// Test full override struct format
+	yamlStr := `
+url: "https://example.com/pkg-3.7.0.tar.gz"
+start_cmd: "./bin/start --config=prod"
+stop_cmd: "./bin/stop"
+`
+	var v VersionEntry
+	if err := yaml.Unmarshal([]byte(yamlStr), &v); err != nil {
+		t.Fatalf("unmarshal struct failed: %v", err)
+	}
+	if v.URL != "https://example.com/pkg-3.7.0.tar.gz" {
+		t.Errorf("expected URL, got %q", v.URL)
+	}
+	if v.StartCmd != "./bin/start --config=prod" {
+		t.Errorf("expected start_cmd, got %q", v.StartCmd)
+	}
+	if v.StopCmd != "./bin/stop" {
+		t.Errorf("expected stop_cmd, got %q", v.StopCmd)
+	}
+}
+
+func TestVersionEntryUnmarshalYAMLInvalid(t *testing.T) {
+	// Neither string nor valid struct
+	yamlStr := `[1, 2, 3]`
+	var v VersionEntry
+	err := yaml.Unmarshal([]byte(yamlStr), &v)
+	if err == nil {
+		t.Fatal("expected error for invalid YAML type")
+	}
+}
+
+func TestGetProvisionForVersion(t *testing.T) {
+	// Register a test plugin with version-specific provision
+	pluginDef := PluginDef{
+		Name: "test-provision-svc",
+		Provision: PluginProvision{
+			Packages: []string{"base-pkg"},
+			Commands: []string{"echo base-setup"},
+		},
+		Package: PackageInfo{
+			DefaultVersion: "2.0.0",
+			Versions: map[string]VersionEntry{
+				"2.0.0": {
+					URL: "https://example.com/svc-2.0.0.tar.gz",
+					Provision: &PluginProvision{
+						Packages: []string{"v2-pkg"},
+						Commands: []string{"echo v2-setup"},
+					},
+				},
+				"1.0.0": {
+					URL: "https://example.com/svc-1.0.0.tar.gz",
+					// No version-specific provision
+				},
+			},
+		},
+	}
+	Register(&PluginHandler{Def: pluginDef})
+
+	// Test version-specific provision
+	prov := GetProvisionForVersion("test-provision-svc", "2.0.0")
+	if prov == nil {
+		t.Fatal("expected non-nil provision for version 2.0.0")
+	}
+	if len(prov.Packages) != 1 || prov.Packages[0] != "v2-pkg" {
+		t.Errorf("expected v2-pkg, got %v", prov.Packages)
+	}
+
+	// Test fallback to default version provision (version "1.0.0" has no provision, falls to default "2.0.0")
+	prov = GetProvisionForVersion("test-provision-svc", "1.0.0")
+	if prov == nil {
+		t.Fatal("expected non-nil provision for version 1.0.0 (fallback to default)")
+	}
+	if prov.Packages[0] != "v2-pkg" {
+		t.Errorf("expected fallback to default version provision, got %v", prov.Packages)
+	}
+
+	// Test fallback to plugin-level provision for unknown type
+	prov = GetProvisionForVersion("nonexistent-type", "1.0.0")
+	if prov != nil {
+		t.Errorf("expected nil for nonexistent type, got %v", prov)
+	}
+}
+
+func TestSetEmbeddedPluginsAndLoad(t *testing.T) {
+	// Clear any previously set embedded data
+	SetEmbeddedPlugins(nil)
+	LoadEmbeddedPlugins() // should be a no-op with nil data
+
+	// Set embedded plugin data
+	pluginYAML := []byte(`
+name: embedded-test-svc
+description: An embedded test service
+start_cmd: "./bin/start"
+stop_cmd: "./bin/stop"
+`)
+	SetEmbeddedPlugins(map[string][]byte{
+		"embedded-test-svc.yaml": pluginYAML,
+	})
+
+	// Load embedded plugins
+	LoadEmbeddedPlugins()
+
+	// Verify it was registered
+	h, err := Get("embedded-test-svc")
+	if err != nil {
+		t.Fatalf("expected embedded-test-svc to be registered: %v", err)
+	}
+	if h.Name() != "embedded-test-svc" {
+		t.Errorf("expected name embedded-test-svc, got %s", h.Name())
+	}
+
+	// Verify it has correct commands
+	start := h.DefaultStartCmd("/app/svc", 8080)
+	if start != "./bin/start" {
+		t.Errorf("expected './bin/start', got %q", start)
+	}
+}
+
+func TestLoadEmbeddedPluginsNoName(t *testing.T) {
+	// Plugin with no name should derive name from filename
+	pluginYAML := []byte(`
+description: No name field
+start_cmd: "./start"
+`)
+	SetEmbeddedPlugins(map[string][]byte{
+		"derived-name-svc.yaml": pluginYAML,
+	})
+
+	LoadEmbeddedPlugins()
+
+	h, err := Get("derived-name-svc")
+	if err != nil {
+		t.Fatalf("expected derived-name-svc to be registered: %v", err)
+	}
+	if h.Name() != "derived-name-svc" {
+		t.Errorf("expected derived name, got %s", h.Name())
+	}
+}
+
+func TestLoadEmbeddedPluginsInvalidYAML(t *testing.T) {
+	SetEmbeddedPlugins(map[string][]byte{
+		"bad.yaml": []byte("[invalid yaml: broken"),
+	})
+
+	// Should not panic
+	LoadEmbeddedPlugins()
+}
+
+func TestPluginHandlerVersionOverride(t *testing.T) {
+	h := &PluginHandler{
+		Def: PluginDef{
+			Name:     "versioned-svc",
+			StartCmd: "default-start",
+			StopCmd:  "default-stop",
+			Package: PackageInfo{
+				DefaultVersion: "3.0.0",
+				Versions: map[string]VersionEntry{
+					"3.0.0": {
+						URL:      "https://example.com/svc-3.0.0.tar.gz",
+						StartCmd: "v3-start --config=new",
+						StopCmd:  "v3-stop",
+					},
+				},
+			},
+		},
+	}
+
+	// Version override should take precedence
+	start := h.DefaultStartCmd("/app/svc", 9092)
+	if start != "v3-start --config=new" {
+		t.Errorf("expected version override start cmd, got %q", start)
+	}
+
+	stop := h.DefaultStopCmd("/app/svc", 9092)
+	if stop != "v3-stop" {
+		t.Errorf("expected version override stop cmd, got %q", stop)
+	}
+}
+
+func TestPluginHandlerVersionOverridePartial(t *testing.T) {
+	// Version entry with only StartCmd override, StopCmd should use default
+	h := &PluginHandler{
+		Def: PluginDef{
+			Name:     "partial-override-svc",
+			StartCmd: "default-start",
+			StopCmd:  "default-stop",
+			Package: PackageInfo{
+				DefaultVersion: "2.0.0",
+				Versions: map[string]VersionEntry{
+					"2.0.0": {
+						URL:      "https://example.com/svc-2.0.0.tar.gz",
+						StartCmd: "v2-start",
+						// No StopCmd override
+					},
+				},
+			},
+		},
+	}
+
+	start := h.DefaultStartCmd("/app/svc", 0)
+	if start != "v2-start" {
+		t.Errorf("expected version override start cmd, got %q", start)
+	}
+
+	stop := h.DefaultStopCmd("/app/svc", 0)
+	if stop != "default-stop" {
+		t.Errorf("expected default stop cmd since version only overrides start, got %q", stop)
+	}
+}
+
+func TestPluginHandlerVersionOverrideNoOverrideFields(t *testing.T) {
+	// Version entry with only URL (no override fields) should not trigger override
+	h := &PluginHandler{
+		Def: PluginDef{
+			Name:     "url-only-svc",
+			StartCmd: "default-start",
+			Package: PackageInfo{
+				DefaultVersion: "1.0.0",
+				Versions: map[string]VersionEntry{
+					"1.0.0": {
+						URL: "https://example.com/svc-1.0.0.tar.gz",
+						// No command overrides
+					},
+				},
+			},
+		},
+	}
+
+	start := h.DefaultStartCmd("/app/svc", 0)
+	if start != "default-start" {
+		t.Errorf("expected default start cmd (URL-only entry should not override), got %q", start)
 	}
 }
