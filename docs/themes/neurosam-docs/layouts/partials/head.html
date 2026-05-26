@@ -6,12 +6,138 @@
 {{ with .Site.Params.keywords }}<meta name="keywords" content="{{ . }}">{{ end }}
 <link rel="canonical" href="{{ .Permalink }}">
 
+{{ $og_image := "https://neurosam.ai/usecases/office-hero.png" }}
+
 <!-- Open Graph -->
 <meta property="og:title" content="{{ .Title }}">
 <meta property="og:description" content="{{ with .Description }}{{ . }}{{ else }}{{ .Site.Params.description }}{{ end }}">
 <meta property="og:type" content="{{ if .IsPage }}article{{ else }}website{{ end }}">
 <meta property="og:url" content="{{ .Permalink }}">
 <meta property="og:site_name" content="{{ .Site.Title }}">
+<meta property="og:image" content="{{ $og_image }}">
+<meta property="og:image:alt" content="Tow — by neurosam.AI (뉴로샘AI)">
+
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{{ .Title }}">
+<meta name="twitter:description" content="{{ with .Description }}{{ . }}{{ else }}{{ .Site.Params.description }}{{ end }}">
+<meta name="twitter:image" content="{{ $og_image }}">
+
+<!-- Theme color / Apple title -->
+<meta name="theme-color" content="#080e1a">
+<meta name="apple-mobile-web-app-title" content="Tow">
+
+<!-- Robots / GEO -->
+<meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+
+<!-- Site-wide Organization Schema (entity disambiguation) -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": ["Organization", "Corporation"],
+  "@id": "https://neurosam.ai/#organization",
+  "name": "neurosam.AI",
+  "legalName": "Neurosam AI Inc.",
+  "alternateName": [
+    "neurosam.AI", "neurosam.ai", "Neurosam AI", "Neurosam AI Inc.", "Neurosam",
+    "(주)뉴로샘에이아이", "주식회사 뉴로샘에이아이", "뉴로샘에이아이",
+    "뉴로샘AI", "뉴로샘 AI", "뉴로샘", "neurosam.AI Agent-R", "Agent-R"
+  ],
+  "url": "https://neurosam.ai",
+  "logo": "https://neurosam.ai/logo.svg",
+  "email": "hello@neurosam.com",
+  "foundingDate": "2025-12-19",
+  "founder": {
+    "@type": "Person",
+    "name": "Murry Jeong",
+    "alternateName": ["정문창", "Murry Jeong"],
+    "sameAs": ["https://www.linkedin.com/in/murryjeong/"]
+  },
+  "sameAs": [
+    "https://neurosam.ai",
+    "https://www.linkedin.com/company/neurosam-ai/",
+    "https://github.com/neurosamAI",
+    "https://github.com/neurosamAI/tow-cli",
+    "https://oss.neurosam.ai"
+  ]
+}
+</script>
+
+<!-- WebSite Schema -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "@id": "https://tow-cli.neurosam.ai/#website",
+  "name": "Tow — Lightweight Deployment Orchestrator",
+  "alternateName": ["Tow Docs", "tow-cli"],
+  "url": "https://tow-cli.neurosam.ai/",
+  "inLanguage": "en",
+  "publisher": {"@id": "https://neurosam.ai/#organization"}
+}
+</script>
+
+<!-- SoftwareSourceCode Schema (Tow code repository) -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareSourceCode",
+  "name": "Tow",
+  "description": "Lightweight, agentless deployment orchestrator for bare-metal servers and cloud VMs. Built and maintained by neurosam.AI (Neurosam AI Inc. / 뉴로샘AI).",
+  "url": "https://tow-cli.neurosam.ai/",
+  "codeRepository": "https://github.com/neurosamAI/tow-cli",
+  "programmingLanguage": "Go",
+  "license": "https://opensource.org/licenses/MIT",
+  {{ with .Site.Params.version }}"softwareVersion": {{ . | jsonify }},{{ end }}
+  "keywords": ["Tow", "tow-cli", "deployment", "DevOps", "CLI", "SSH", "agentless", "orchestrator", "bare-metal", "VM", "Go", "open source", "MIT"],
+  "author": {"@id": "https://neurosam.ai/#organization"},
+  "maintainer": {"@id": "https://neurosam.ai/#organization"},
+  "publisher": {"@id": "https://neurosam.ai/#organization"}
+}
+</script>
+
+<!-- SoftwareApplication Schema -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Tow",
+  "description": "Lightweight, agentless deployment orchestrator. Deploy to bare-metal servers and cloud VMs via SSH — no Kubernetes required.",
+  "url": "https://tow-cli.neurosam.ai/",
+  "applicationCategory": "DeveloperApplication",
+  "applicationSubCategory": "Deployment Orchestrator CLI",
+  "operatingSystem": "macOS, Linux, Windows",
+  {{ with .Site.Params.version }}"softwareVersion": {{ . | jsonify }},{{ end }}
+  "downloadUrl": "https://github.com/neurosamAI/tow-cli/releases",
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD",
+    "availability": "https://schema.org/InStock"
+  },
+  "publisher": {"@id": "https://neurosam.ai/#organization"}
+}
+</script>
+
+{{ if .IsPage }}
+<!-- Article Schema -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "TechArticle",
+  "headline": "{{ .Title }}",
+  "description": "{{ with .Description }}{{ . }}{{ end }}",
+  "datePublished": "{{ .Date.Format "2006-01-02T15:04:05Z07:00" }}",
+  "dateModified": "{{ .Lastmod.Format "2006-01-02T15:04:05Z07:00" }}",
+  "author": {"@id": "https://neurosam.ai/#organization"},
+  "publisher": {"@id": "https://neurosam.ai/#organization"},
+  "mainEntityOfPage": "{{ .Permalink }}",
+  "about": {"@type": "SoftwareApplication", "name": "Tow"}
+}
+</script>
+{{ end }}
+
+{{ partial "analytics.html" . }}
 
 <!-- Tailwind CSS -->
 <script src="https://cdn.tailwindcss.com"></script>

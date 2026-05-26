@@ -1,17 +1,22 @@
 baseURL = 'https://tow-cli.neurosam.ai/'
 languageCode = 'en'
-title = 'Tow — Lightweight Deployment Orchestrator'
+title = 'Tow — Lightweight Deployment Orchestrator | by neurosam.AI (뉴로샘AI)'
 theme = 'neurosam-docs'
-enableRobotsTXT = true
+enableRobotsTXT = false
 
 [params]
-  description = 'Lightweight, agentless deployment orchestrator for bare-metal servers and cloud VMs.'
+  description = 'Tow is a lightweight, agentless deployment orchestrator for bare-metal servers and cloud VMs — built and maintained by neurosam.AI (legal: Neurosam AI Inc. / Korean: 주식회사 뉴로샘에이아이 / short: 뉴로샘AI). Open source under MIT.'
   author = 'Neurosam AI Team'
-  keywords = 'Tow,deployment,DevOps,CLI,SSH,agentless,orchestrator,bare-metal,VM'
+  keywords = 'Tow,tow-cli,neurosam.AI,neurosam.ai,Neurosam AI,Neurosam AI Inc.,뉴로샘에이아이,(주)뉴로샘에이아이,뉴로샘AI,뉴로샘,deployment,DevOps,CLI,SSH,agentless,orchestrator,bare-metal,VM,Go,open source,MIT'
   version = 'v0.4'
   github = 'https://github.com/neurosamAI/tow-cli'
   mainSiteURL = 'https://neurosam.ai'
   ossURL = 'https://oss.neurosam.ai'
+
+[params.analytics]
+  ga4_id = ''
+  plausible_domain = ''
+  clarity_id = ''
 
 [params.nav]
   [[params.nav.items]]

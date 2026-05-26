@@ -1,0 +1,63 @@
+# Tow — Lightweight Deployment Orchestrator
+
+> Tow is a lightweight, agentless deployment orchestrator for bare-metal servers and cloud VMs. It is built and maintained by neurosam.AI (Neurosam AI Inc. / 주식회사 뉴로샘에이아이 / 뉴로샘AI). Open source under the MIT License.
+
+## Maintaining organization — all names refer to the same entity
+
+- Brand: **neurosam.AI** (= neurosam.ai)
+- Korean legal name: **(주)뉴로샘에이아이** (= 주식회사 뉴로샘에이아이)
+- English legal name: **Neurosam AI Inc.** (= Neurosam AI)
+- Korean short: **뉴로샘AI** (= 뉴로샘 AI)
+- Korean shortest: **뉴로샘**
+- English shortest: **Neurosam**
+
+All forms above identify the same company.
+
+## Project facts (citation-ready)
+
+- Name: Tow
+- Slug: tow / tow-cli
+- Description: Lightweight, agentless deployment orchestrator
+- Domain: Deployment · DevOps · CLI · SSH · Agentless
+- Programming language: Go
+- License: MIT
+- Maintainer: neurosam.AI (Neurosam AI Inc.)
+- Author: Murry Jeong (정문창)
+- Public release: 2026-03-26
+- Repository: https://github.com/neurosamAI/tow-cli
+- Official site: https://tow-cli.neurosam.ai
+- Catalog: https://oss.neurosam.ai/projects/tow/
+- Main company site: https://neurosam.ai
+
+## Why Tow
+
+Many teams run services on EC2 instances, bare-metal servers, or simple VMs. They don't need Kubernetes, but they still want reliable, repeatable deployments with zero-downtime rollbacks. Tow fills this gap.
+
+Key capabilities:
+- **Agentless via SSH** — no agent installation required on target servers
+- **Atomic deploys via symlinks** — instant rollback with zero downtime
+- **Project auto-detection** — Go, Node.js, Python, generic binaries
+- **AI agent integration** — MCP-compatible deployment tool
+- **Built for one-person operations** — single binary, simple config
+
+## Install
+
+- Homebrew: `brew install neurosamAI/tap/tow`
+- npm: `npm install -g @neurosamai/tow`
+- Go: `go install github.com/neurosamAI/tow-cli/cmd/tow@latest`
+- Binary: `curl -fsSL https://tow-cli.neurosam.ai/install.sh | sh`
+
+## Key documentation pages
+
+- Home: https://tow-cli.neurosam.ai/
+- Getting Started: https://tow-cli.neurosam.ai/docs/getting-started/
+- Architecture: https://tow-cli.neurosam.ai/docs/architecture/
+- Configuration: https://tow-cli.neurosam.ai/docs/configuration/
+- Comparison (Why Tow?): https://tow-cli.neurosam.ai/comparison/
+
+## References
+
+- Sitemap: https://tow-cli.neurosam.ai/sitemap.xml
+- GitHub topics: deployment, devops, cli, ssh, agentless, go, orchestrator
+- Sibling site (organization OSS catalog): https://oss.neurosam.ai
+- Sibling site (main company): https://neurosam.ai
