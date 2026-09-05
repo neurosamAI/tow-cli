@@ -1,13 +1,11 @@
 baseURL = 'https://tow-cli.neurosam.ai/'
-languageCode = 'en'
-title = 'Tow — Lightweight Deployment Orchestrator | by neurosam.AI (뉴로샘AI)'
 theme = 'neurosam-docs'
 enableRobotsTXT = false
+defaultContentLanguage = 'en'
+defaultContentLanguageInSubdir = false
 
 [params]
-  description = 'Tow is a lightweight, agentless deployment orchestrator for bare-metal servers and cloud VMs — built and maintained by neurosam.AI (legal: Neurosam AI Inc. / Korean: 주식회사 뉴로샘에이아이 / short: 뉴로샘AI). Open source under MIT.'
   author = 'Neurosam AI Team'
-  keywords = 'Tow,tow-cli,neurosam.AI,neurosam.ai,Neurosam AI,Neurosam AI Inc.,뉴로샘에이아이,(주)뉴로샘에이아이,뉴로샘AI,뉴로샘,deployment,DevOps,CLI,SSH,agentless,orchestrator,bare-metal,VM,Go,open source,MIT'
   version = 'v0.4'
   github = 'https://github.com/neurosamAI/tow-cli'
   mainSiteURL = 'https://neurosam.ai'
@@ -18,43 +16,100 @@ enableRobotsTXT = false
   plausible_domain = ''
   clarity_id = 'x00bpbkmbw'
 
-[params.nav]
-  [[params.nav.items]]
-    title = 'Home'
-    url = '/'
+[languages]
+  [languages.en]
+    languageCode = 'en'
+    languageName = 'English'
     weight = 1
-  [[params.nav.items]]
-    title = 'Getting Started'
-    url = '/docs/getting-started/'
+    title = 'Tow — Lightweight Deployment Orchestrator | by neurosam.AI (뉴로샘AI)'
+    [languages.en.params]
+      description = 'Tow is a lightweight, agentless deployment orchestrator for bare-metal servers and cloud VMs — built and maintained by neurosam.AI (legal: Neurosam AI Inc. / Korean: 주식회사 뉴로샘에이아이 / short: 뉴로샘AI). Open source under MIT.'
+      keywords = 'Tow,tow-cli,neurosam.AI,neurosam.ai,Neurosam AI,Neurosam AI Inc.,deployment,DevOps,CLI,SSH,agentless,orchestrator,bare-metal,VM,Go,open source,MIT'
+      tagline = 'Deploy without the complexity'
+    [languages.en.params.nav]
+      [[languages.en.params.nav.items]]
+        title = 'Home'
+        url = '/'
+        weight = 1
+      [[languages.en.params.nav.items]]
+        title = 'Getting Started'
+        url = '/docs/getting-started/'
+        weight = 2
+      [[languages.en.params.nav.items]]
+        title = 'Architecture'
+        url = '/docs/architecture/'
+        weight = 3
+      [[languages.en.params.nav.items]]
+        title = 'Configuration'
+        url = '/docs/configuration/'
+        weight = 4
+      [[languages.en.params.nav.items]]
+        title = 'Commands'
+        url = '/docs/commands/'
+        weight = 5
+      [[languages.en.params.nav.items]]
+        title = 'Secrets & Security'
+        url = '/docs/security/'
+        weight = 6
+      [[languages.en.params.nav.items]]
+        title = 'Examples'
+        url = '/docs/examples/'
+        weight = 7
+      [[languages.en.params.nav.items]]
+        title = 'Comparison'
+        url = '/docs/comparison/'
+        weight = 8
+      [[languages.en.params.nav.items]]
+        title = 'Contributing'
+        url = '/docs/contributing/'
+        weight = 9
+
+  [languages.ko]
+    languageCode = 'ko-KR'
+    languageName = '한국어'
     weight = 2
-  [[params.nav.items]]
-    title = 'Architecture'
-    url = '/docs/architecture/'
-    weight = 3
-  [[params.nav.items]]
-    title = 'Configuration'
-    url = '/docs/configuration/'
-    weight = 4
-  [[params.nav.items]]
-    title = 'Commands'
-    url = '/docs/commands/'
-    weight = 5
-  [[params.nav.items]]
-    title = 'Secrets & Security'
-    url = '/docs/security/'
-    weight = 6
-  [[params.nav.items]]
-    title = 'Examples'
-    url = '/docs/examples/'
-    weight = 7
-  [[params.nav.items]]
-    title = 'Comparison'
-    url = '/docs/comparison/'
-    weight = 8
-  [[params.nav.items]]
-    title = 'Contributing'
-    url = '/docs/contributing/'
-    weight = 9
+    title = 'Tow — 경량 배포 오케스트레이터 | by neurosam.AI (뉴로샘AI)'
+    [languages.ko.params]
+      description = 'Tow는 Kubernetes 없이 SSH만으로 베어메탈 서버와 클라우드 VM에 배포하는 경량 에이전트리스 오케스트레이터입니다 — neurosam.AI(법인명 (주)뉴로샘에이아이 / 영문 Neurosam AI Inc. / 약칭 뉴로샘AI)가 만들고 관리합니다. MIT 라이선스 오픈소스.'
+      keywords = 'Tow,tow-cli,neurosam.AI,neurosam.ai,Neurosam AI,Neurosam AI Inc.,뉴로샘에이아이,(주)뉴로샘에이아이,뉴로샘AI,뉴로샘,배포,DevOps,CLI,SSH,에이전트리스,오케스트레이터,베어메탈,VM,Go,오픈소스,MIT'
+      tagline = '복잡함 없이 배포하기'
+    [languages.ko.params.nav]
+      [[languages.ko.params.nav.items]]
+        title = '홈'
+        url = '/ko/'
+        weight = 1
+      [[languages.ko.params.nav.items]]
+        title = '시작하기'
+        url = '/ko/docs/getting-started/'
+        weight = 2
+      [[languages.ko.params.nav.items]]
+        title = '아키텍처'
+        url = '/ko/docs/architecture/'
+        weight = 3
+      [[languages.ko.params.nav.items]]
+        title = '설정'
+        url = '/ko/docs/configuration/'
+        weight = 4
+      [[languages.ko.params.nav.items]]
+        title = '커맨드'
+        url = '/ko/docs/commands/'
+        weight = 5
+      [[languages.ko.params.nav.items]]
+        title = '시크릿 & 보안'
+        url = '/ko/docs/security/'
+        weight = 6
+      [[languages.ko.params.nav.items]]
+        title = '예제'
+        url = '/ko/docs/examples/'
+        weight = 7
+      [[languages.ko.params.nav.items]]
+        title = '비교'
+        url = '/ko/docs/comparison/'
+        weight = 8
+      [[languages.ko.params.nav.items]]
+        title = '기여하기'
+        url = '/ko/docs/contributing/'
+        weight = 9
 
 [sitemap]
   changefreq = 'weekly'
