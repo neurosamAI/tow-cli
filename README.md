@@ -3,6 +3,10 @@
 </p>
 
 <p align="center">
+  <b>English</b> | <a href="README.ko.md">한국어</a>
+</p>
+
+<p align="center">
   <em>Lightweight, agentless deployment orchestrator for bare-metal servers and cloud VMs.</em>
 </p>
 

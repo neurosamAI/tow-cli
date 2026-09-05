@@ -9,6 +9,13 @@
       <span class="text-sm text-gray-500 hidden sm:inline">{{ with .Title }}{{ . }}{{ end }}</span>
     </div>
     <div class="flex items-center gap-3">
+      {{ with .AllTranslations.ByLanguage }}
+      <div class="flex items-center gap-1 text-xs mr-1">
+        {{ range . }}
+        <a href="{{ .Permalink }}" class="px-1.5 py-0.5 rounded transition-colors {{ if eq .Language.Lang $.Language.Lang }}text-gray-300 bg-white/[0.06]{{ else }}text-gray-600 hover:text-gray-300{{ end }}">{{ .Language.LanguageName }}</a>
+        {{ end }}
+      </div>
+      {{ end }}
       <a href="{{ .Site.Params.ossURL }}" class="text-xs text-gray-500 hover:text-gray-300 transition-colors hidden sm:inline">Open Source</a>
       <a href="{{ .Site.Params.mainSiteURL }}" class="text-xs text-gray-500 hover:text-gray-300 transition-colors hidden sm:inline">neurosam.AI</a>
       <a href="{{ .Site.Params.github }}" target="_blank" class="text-gray-500 hover:text-gray-300 transition-colors">
