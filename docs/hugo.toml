@@ -14,9 +14,9 @@ enableRobotsTXT = false
   ossURL = 'https://oss.neurosam.ai'
 
 [params.analytics]
-  ga4_id = ''
+  ga4_id = 'G-YPGV2E40BW'
   plausible_domain = ''
-  clarity_id = ''
+  clarity_id = 'x00bpbkmbw'
 
 [params.nav]
   [[params.nav.items]]
